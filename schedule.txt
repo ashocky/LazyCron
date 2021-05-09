@@ -1,0 +1,23 @@
+# Usage Notes:
+# This is a tab delimimted file. Make sure you have actual tabs enabled in your text editor (or at least use 4 spaces between fields)
+# Use * for fields that you don't need to fill in.
+
+# "Time" is the window is when the script is allowed to run. You can have multiple windows seperated with commas. For example: 1-3am, 2pm-4m, 11:30-11:34 - Play around with these numbers, the system is very flexible. When you run my script it will show you the next time window available for each program.
+
+# Not sure if your schedule will work correctly? Run the program with the --testing option to show what it would do.
+
+# "Frequency" is how often the program. m = minutes, h = hours and so on. My script should allow most natural language inputs here. Set as * and it will only run once a day.
+
+# Requirements is a comma seperated list of additional requirements needed for the script to run. Available ones are as follows:
+#     idle    = Time the computer has been idle for
+#     plugged = Power cord must be attached
+#     closed  = Lid must be closed
+#     random  = Script will run randomly. On average it will run every so many minutes.
+
+
+#Examples:
+#Time                Frequency        Requirements            Script Path
+9:30-11, 3pm-5pm	*			     idle 5m, plugged		  # ./backup_script_path_goes_here.sh
+-5pm                *                random 8h                # ./A_surprise_everyday.py
+4-6pm               *                *                        # mpg123 'Libera - Going Home.mp3'
+*                   *                *                        # ./a_daily_script.py
