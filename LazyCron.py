@@ -9,7 +9,7 @@ import time
 import random
 import argparse
 
-import common as sd_common
+import sd_common as common
 from common import warn, indenter, check_install, mkdir, convert_ut_range, rint
 from common import local_time, convert_user_time, spawn, safe_filename, msleep
 from common import search_list, error, gohome, read_csv, read_state, itercount
