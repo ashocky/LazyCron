@@ -2,9 +2,6 @@
 # LazyCron - "Your computer will get around to it eventually."
 # Usage: Run with -h for help.
 
-#todo convert tabs to spaces and git push to the hub
-#todo run through all of common with pylint at once
-
 ################################################################################
 
 import os
