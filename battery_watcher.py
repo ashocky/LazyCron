@@ -7,10 +7,9 @@ import time
 import sys
 import os
 
-
-from sd_common import diff_days, local_time, trailing_avg, chunker, read_file
+from sd_common import local_time, trailing_avg, chunker, read_file
 from sd_common import msleep, pmsleep, Eprinter, eprint, error, read_val, list_get
-from sd_common import bisect_small, fmt_time, sig, DebugSetup, debug_pass as debug
+from sd_common import fmt_time, debug_pass as debug
 
 
 eprint = Eprinter(verbose=1).eprint		# pylint: disable=C0103
@@ -199,7 +198,6 @@ def wait4popup(batt, target):
 
 
 def _main():
-	import tkinter as tk
 	"Wait until the battery gets to target level and then popup a warning"
 	batt = BatteryWatcher()
 	target = list_get(sys.argv, 1, 5)
@@ -208,4 +206,5 @@ def _main():
 
 
 if __name__ == "__main__":
+	import tkinter as tk
 	_main()

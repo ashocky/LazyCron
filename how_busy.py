@@ -10,10 +10,8 @@ import itertools
 import time
 import os
 
-
-from sd_common import Eprinter, eprint, warn, quickrun, sig, percent, avg
-from sd_common import sorted_array, check_install, list_get, indenter
-from sd_common import print_columns, auto_columns, flatten
+from sd_common import quickrun, percent, avg, auto_cols, flatten
+from sd_common import sorted_array, check_install, list_get
 
 def is_device_busy(dev, wait=2, reps=4, verbose=0):
 	"Check how busy the device is"
@@ -74,7 +72,7 @@ def get_network_usage(interval=1, samples=4, verbose=0):
 
 	out = quickrun("sar -n DEV".split(), interval, samples, verbose=verbose)
 	if verbose:
-		auto_columns(map(str.split, out[-3:]))
+		auto_cols(map(str.split, out[-3:]))
 	out = [line for line in out if line.startswith('Average:')]
 	out = flatten([line.split()[4:6] for line in out[1:]])
 	return int(sum(map(float, out)))

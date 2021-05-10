@@ -202,6 +202,9 @@ def auto_columns(array, space=4, manual=None, printme=True, wrap=0, crop=[]):
 	return col_width
 
 
+auto_cols = auto_columns
+
+
 def print_columns(args, col_width=20, columns=None, just='left', space=0, wrap=True):
 	'''Print columns of col_width size.
 	columns = manual list of column widths

@@ -9,7 +9,6 @@ import time
 import random
 import argparse
 
-
 from sd_common import warn, indenter, check_install, mkdir, convert_ut_range, rint
 from sd_common import local_time, convert_user_time, spawn, safe_filename, msleep
 from sd_common import search_list, error, gohome, read_csv, read_state, itercount
@@ -55,6 +54,7 @@ class Scheduler:
 		self.last_run = 0           # Last time the script was run
 		self.next_elapsed = 0       # Next run time
 		self.window = [[0, 86400]]  # Start and stop times
+		self.date_window = []		# Allowed days
 		self.freq = 0               # Frequency
 		self.path = args['path']    # Path to script
 		self.thread = None          # Thread starting running process
@@ -200,7 +200,7 @@ class Scheduler:
 def read_schedule(schedule_apps, schedule_file):
 	"Read the schedule file:"
 	new_sched = []
-	headers = "time frequency reqs path".split()
+	headers = "date time frequency reqs path".split()
 	for line in read_csv(schedule_file, headers=headers, delimiter=("\t", " " * 4), merge=True):
 		print('\n\nline =', repr(line))
 		if not all(line.values()):
