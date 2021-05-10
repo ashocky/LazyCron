@@ -16,8 +16,8 @@
 
 
 #Examples:
-#Time                Frequency        Requirements            Script Path
-9:30-11, 3pm-5pm	*			     idle 5m, plugged		  # ./backup_script_path_goes_here.sh
--5pm                *                random 8h                # ./A_surprise_everyday.py
-4-6pm               *                *                        # mpg123 'Libera - Going Home.mp3'
-*                   *                *                        # ./a_daily_script.py
+#Date               #Time                Frequency        Requirements            Script Path
+sunday              9:30-11, 3pm-5pm    *                idle 5m, plugged         # ./backup_script_path_goes_here.sh
+*                   -5pm                *                random 8h                # ./A_surprise_everyday.py
+m-f                 4-6pm               *                *                        # mpg123 'Libera - Going Home.mp3'
+*                   *                   *                *                        # ./a_daily_script.py

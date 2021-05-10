@@ -7,10 +7,10 @@ import time
 import sys
 import os
 
-import sd_common as common
-from common import diff_days, local_time, trailing_avg, chunker, read_file
-from common import msleep, pmsleep, Eprinter, eprint, error, read_val, list_get
-from common import bisect_small, fmt_time, sig, DebugSetup, debug, debug_pass
+
+from sd_common import diff_days, local_time, trailing_avg, chunker, read_file
+from sd_common import msleep, pmsleep, Eprinter, eprint, error, read_val, list_get
+from sd_common import bisect_small, fmt_time, sig, DebugSetup, debug_pass as debug
 
 
 eprint = Eprinter(verbose=1).eprint		# pylint: disable=C0103

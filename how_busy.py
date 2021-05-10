@@ -10,10 +10,10 @@ import itertools
 import time
 import os
 
-import sd_common as common
-from common import Eprinter, eprint, warn, quickrun, sig, percent, avg
-from common import sorted_array, check_install, list_get, indenter
-from common import print_columns, auto_columns, flatten
+
+from sd_common import Eprinter, eprint, warn, quickrun, sig, percent, avg
+from sd_common import sorted_array, check_install, list_get, indenter
+from sd_common import print_columns, auto_columns, flatten
 
 def is_device_busy(dev, wait=2, reps=4, verbose=0):
 	"Check how busy the device is"

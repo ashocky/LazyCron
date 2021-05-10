@@ -9,12 +9,12 @@ import time
 import random
 import argparse
 
-import sd_common as common
-from common import warn, indenter, check_install, mkdir, convert_ut_range, rint
-from common import local_time, convert_user_time, spawn, safe_filename, msleep
-from common import search_list, error, gohome, read_csv, read_state, itercount
-from common import argfixer, seconds_since_midnight, fmt_time, Eprinter
-from common import DotDict, joiner, quickrun, shell, tman
+
+from sd_common import warn, indenter, check_install, mkdir, convert_ut_range, rint
+from sd_common import local_time, convert_user_time, spawn, safe_filename, msleep
+from sd_common import search_list, error, gohome, read_csv, read_state, itercount
+from sd_common import argfixer, seconds_since_midnight, fmt_time, Eprinter
+from sd_common import DotDict, joiner, quickrun, shell, tman
 
 
 from battery_watcher import BatteryWatcher
@@ -30,13 +30,6 @@ def is_busy():
 		print("Network Usage:", net_usage)
 		print("Disk usage:   ", disk_usage)
 	return True
-
-
-'''
-def get_active_name():
-	"Get name of the active window"
-	return psutil.Process(int(shell('xdotool getactivewindow getwindowpid'))).name().title()
-'''
 
 
 def lid_open():
