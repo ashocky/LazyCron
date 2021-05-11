@@ -20,7 +20,7 @@ class BatteryWatcher:
 	def __init__(self):
 		self.max_power = int(read_file(self.get_filename('charge_full')))
 		self.capacity = open(self.get_filename('charge_now'))
-		self.plug = open(self.get_filename('onlne'))
+		self.plug = open(self.get_filename('online'))
 		self.levels = dict()                # Dict of power level percents to timestamps
 		self.charge = self.check_batt()  	# Updated only with call to check_batt
 
