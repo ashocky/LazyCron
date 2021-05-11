@@ -9,7 +9,7 @@ import os
 
 from sd_common import local_time, trailing_avg, chunker, read_file
 from sd_common import msleep, pmsleep, Eprinter, eprint, error, read_val, list_get
-from sd_common import fmt_time, debug_pass as debug
+from sd_common import fmt_time, debug_pass as debug, warn
 
 
 eprint = Eprinter(verbose=1).eprint		# pylint: disable=C0103
@@ -20,7 +20,7 @@ class BatteryWatcher:
 	def __init__(self):
 		self.max_power = int(read_file(self.get_filename('charge_full')))
 		self.capacity = open(self.get_filename('charge_now'))
-		self.plug = open(self.get_filename('online'))
+		self.plug = open(self.get_filename('onlne'))
 		self.levels = dict()                # Dict of power level percents to timestamps
 		self.charge = self.check_batt()  	# Updated only with call to check_batt
 
@@ -34,7 +34,8 @@ class BatteryWatcher:
 						eprint("Using filename:", name)
 						return name
 		else:
-			error("Could not find a file:", expr, 'in', path)
+			warn("Could not find file:", expr, 'in', path)
+			raise ValueError
 
 	def is_plugged(self):
 		return bool(read_val(self.plug))

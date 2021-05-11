@@ -271,8 +271,6 @@ def main(args):
 
 	schedule_file = args.schedule
 	testing_mode = args.testing
-	if testing_mode:
-		print(args)
 
 	sleep_time = polling_rate   # Time to rest at the end of every loop
 	idle = 0                    # Seconds without user inteaction.
@@ -354,6 +352,14 @@ if __name__ == "__main__":
 
 	# Min level to print messages:
 	print = Eprinter(verbose=1 - UA.verbose).eprint     # pylint: disable=W0622
-	BATTERY = BatteryWatcher()
+	# Workaround for desktop computers:
+	try:
+		BATTERY = BatteryWatcher()
+	except ValueError:
+		print("Battery monitoring will not work.")
+		class BatteryWatcher:
+			def is_plugged(self):
+				return True
+		BATTERY = BatteryWatcher()
 	gohome()
 	main(UA)
