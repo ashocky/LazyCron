@@ -734,7 +734,7 @@ def read_csv(filename, ignore_comments=True, cleanup=True, headers=None, merge=F
 				for d in delimiter[1:]:
 					if d in line:
 						row = next(csv.reader([line.replace(d, delimiter[0])], delimiter=delimiter[0], **kargs))
-						print("Using backup delimiter to read line:", repr(d))
+						#print("Using backup delimiter to read line:", repr(d))
 						break
 				else:
 					continue

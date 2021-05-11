@@ -20,10 +20,15 @@ from battery_watcher import BatteryWatcher
 from how_busy import all_disk_usage, get_network_usage
 
 
-def is_busy():
+def is_busy(max_net=100, max_disk=1):
+	'''Return True if disk or network usage above defaults
+	max_net = Network usage in KB/s
+	max_disk = Disk usage in MB/s
+	'''
+
 	net_usage = get_network_usage(5, 4)     # KB/s
 	disk_usage = all_disk_usage(5, 4)       # MB/s
-	if net_usage < 100 and disk_usage < 1:
+	if net_usage < max_net and disk_usage < max_disk:
 		return False
 	else:
 		print("Network Usage:", net_usage)
@@ -200,7 +205,7 @@ class Scheduler:
 def read_schedule(schedule_apps, schedule_file):
 	"Read the schedule file:"
 	new_sched = []
-	headers = "date time frequency reqs path".split()
+	headers = "days time frequency reqs path".split()
 	for line in read_csv(schedule_file, headers=headers, delimiter=("\t", " " * 4), merge=True):
 		print('\n\nline =', repr(line))
 		if not all(line.values()):
@@ -238,9 +243,9 @@ def parse_args():
 						nargs='?', type=float,
 						help="How often to check (minutes)")
 
-	parser.add_argument('--idle-sleep', default=30,
+	parser.add_argument('--idle', default=0,
 						nargs='?', type=float,
-						help="How long to wait before going to sleep (minutes)")
+						help="How long to wait before going to sleep (minutes) 0=Disable")
 
 	parser.add_argument('--verbose', default=1,
 						nargs='?', type=int,
@@ -257,7 +262,13 @@ def parse_args():
 
 def main(args):
 	polling_rate = args.polling_rate * 60
-	idle_sleep = args.idle_sleep * 60
+	idle_sleep = args.idle * 60
+	if idle_sleep:
+		check_install('iostat', 'sar',
+		msg='''sudo apt install sysstat sar
+		--idle requires iostat () to determine if the computer can be put to sleep.''')
+	check_install('xprintidle', msg="sudo apt install xprintidle")
+
 	schedule_file = args.schedule
 	testing_mode = args.testing
 	if testing_mode:
@@ -303,7 +314,7 @@ def main(args):
 
 		# Read the schedule file if it's been updated
 		if os.path.getmtime(schedule_file) > last_schedule_read:
-			print("\n\nUpdating schedule file:\n")
+			print("\n\nUpdating schedule file:")
 			last_schedule_read = time.time()
 			schedule_apps = read_schedule(schedule_apps, schedule_file)
 
@@ -316,7 +327,9 @@ def main(args):
 					testing = testing_mode
 				proc.run(elapsed=elapsed, idle=idle, polling_rate=polling_rate, testing_mode=testing)
 
-		if total_idle > idle_sleep:
+
+		# Put the computer to sleep after checking to make sure nothing is going on.
+		if idle_sleep and total_idle > idle_sleep:
 			if BATTERY.is_plugged():
 				# Plugged mode waits for idle system.
 				ready, results = tman.query(is_busy, max_age=sleep_time * 1.5)
@@ -341,7 +354,6 @@ if __name__ == "__main__":
 
 	# Min level to print messages:
 	print = Eprinter(verbose=1 - UA.verbose).eprint     # pylint: disable=W0622
-	check_install('xprintidle', 'iostat', msg="sudo apt install xprintidle sysstat")
 	BATTERY = BatteryWatcher()
 	gohome()
 	main(UA)

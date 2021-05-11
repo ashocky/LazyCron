@@ -22,7 +22,7 @@ class BatteryWatcher:
 		self.capacity = open(self.get_filename('charge_now'))
 		self.plug = open(self.get_filename('online'))
 		self.levels = dict()                # Dict of power level percents to timestamps
-		self.charge = self.check_batt()  # Updated only with call to check_batt
+		self.charge = self.check_batt()  	# Updated only with call to check_batt
 
 	def get_filename(self, expr, path='/sys/class/power_supply/'):
 		"Custom filename finder for init"

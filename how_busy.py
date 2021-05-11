@@ -10,7 +10,7 @@ import itertools
 import time
 import os
 
-from sd_common import quickrun, percent, avg, auto_cols, flatten
+from sd_common import quickrun as qrun, percent, avg, auto_cols, flatten
 from sd_common import sorted_array, check_install, list_get
 
 def is_device_busy(dev, wait=2, reps=4, verbose=0):
@@ -19,13 +19,12 @@ def is_device_busy(dev, wait=2, reps=4, verbose=0):
 		reps = 2
 
 	usage = []
-	get_ready = False     # Get ready. The next line contains the percentage
-	for line in quickrun("nice iostat -d -x".split(), dev, wait, reps + 1, verbose=verbose):
-		print(line)
+	get_ready = False     #next line contains the percentage
+	for line in qrun('nice', 'iostat', '-d', '-x', dev, wait, reps + 1, verbose=verbose):
 		val = re.split(' +', line)[-1]
 		if get_ready:
 			usage.append(float(val))
-		get_ready = True if val == '%util' else False
+		get_ready = bool(val == '%util')
 	# print(dev+':', usage[1:], '=', percent(avg(usage[1:])))
 	return avg(usage[1:])
 
@@ -38,7 +37,7 @@ def all_disk_usage(wait=5, reps=4, verbose=0, ignore_links=True):
 	total = 0
 	table = dict()
 	rep = -1
-	for line in quickrun('nice iostat -d ' + str(wait) + ' ' + str(reps + 1), verbose=verbose):
+	for line in qrun('nice', 'iostat', '-d', wait, reps + 1, verbose=verbose):
 		if verbose >= 2:
 			print(rep, line)
 		if not line:
@@ -70,7 +69,7 @@ def get_network_usage(interval=1, samples=4, verbose=0):
 	'''Return total network usage in kB/s, adds up rxkB/s and txkB/s columns from sar
 	Requires: sudo apt install sysstat'''
 
-	out = quickrun("sar -n DEV".split(), interval, samples, verbose=verbose)
+	out = qrun('sar', '-n', 'DEV', interval, samples, verbose=verbose)
 	if verbose:
 		auto_cols(map(str.split, out[-3:]))
 	out = [line for line in out if line.startswith('Average:')]
@@ -81,7 +80,7 @@ def get_network_usage(interval=1, samples=4, verbose=0):
 def find_device(folder):
 	"Given a directory, find the device"
 	if os.path.isdir(folder):
-		return quickrun(['df', folder])[1].split()[0]
+		return qrun(['df', folder])[1].split()[0]
 	return None
 
 
