@@ -8,16 +8,18 @@ import os
 import time
 import random
 import argparse
-
-from sd_common import warn, indenter, check_install, mkdir, convert_ut_range, rint
-from sd_common import local_time, convert_user_time, spawn, safe_filename, msleep
-from sd_common import search_list, error, gohome, read_csv, read_state, itercount
-from sd_common import argfixer, seconds_since_midnight, fmt_time, Eprinter
-from sd_common import DotDict, joiner, quickrun, shell, tman
-
+import datetime
+from datetime import datetime as dada
 
 from battery_watcher import BatteryWatcher
 from how_busy import all_disk_usage, get_network_usage
+
+
+from common import warn, indenter, check_install, mkdir, convert_ut_range, rint
+from common import local_time, convert_user_time, spawn, safe_filename, msleep
+from common import search_list, error, gohome, read_csv, read_state, itercount
+from common import argfixer, seconds_since_midnight, fmt_time, Eprinter
+from common import DotDict, joiner, quickrun, shell, tman, udate, add_date
 
 
 def is_busy(max_net=100, max_disk=1):
@@ -46,6 +48,26 @@ def is_val(var):
 	return len(var) > 1 or var.isdigit()
 
 
+def get_day(day, cycle):
+	"Given a day of the week/month/year, return the next occurence"
+	today = dada(*dada.now().timetuple()[:3])
+	if cycle == 'week':
+		delta = datetime.timedelta((day - today.weekday()))
+	elif cycle == 'month':
+		delta = datetime.timedelta((day - today.day))
+		if delta.days < 0:
+			delta = datetime.timedelta(add_date(today, months=1).replace(day=day) - today)
+	elif cycle == 'year':
+		month, day = day
+		date = today.replace(month=month, day=day)
+		if date < today:
+			date = date.replace(year=date.year)
+		return date
+	else:
+		error('cycle', cycle, "unsupported")
+	return (today + delta)
+
+
 ################################################################################
 
 class Scheduler:
@@ -58,8 +80,8 @@ class Scheduler:
 		self.last_elapsed = 0       # Last elapsed time at run
 		self.last_run = 0           # Last time the script was run
 		self.next_elapsed = 0       # Next run time
-		self.window = [[0, 86400]]  # Start and stop times
-		self.date_window = []		# Allowed days
+		self.window = []            # Start and stop times
+		self.date_window = []       # Allowed days
 		self.freq = 0               # Frequency
 		self.path = args['path']    # Path to script
 		self.thread = None          # Thread starting running process
@@ -92,13 +114,30 @@ class Scheduler:
 				self.reqs.random = convert_user_time(''.join(arg.split('random')[1:]))
 
 		if is_val(args['time']):
-			self.window = []
 			for section in args['time'].split(','):
 				vals = convert_ut_range(section)
 				if len(vals) == 2:
 					self.window.append([vals[0], vals[1]])
 				else:
 					error("Can't read time:", section)
+
+		if is_val(args['date']):
+			for section in args['date'].split(','):
+				try:
+					days, cycles = list(zip(*map(udate, section.split('-'))))
+				except ValueError:
+					error("Cannot understand text:", section)
+				if len(set(cycles)) != 1:
+					error("Cycle length in", section, "must be the same")
+				cycles = cycles[0]
+				start = days[0]
+				if len(days) == 1:
+					end = start
+				else:
+					end = days[1]
+
+				self.date_window.append((start, end, cycles))
+
 
 		if is_val(args['frequency']):
 			self.freq = convert_user_time(args['frequency'])
@@ -114,14 +153,15 @@ class Scheduler:
 		"Print a detailed representation of each app"
 
 		print(self.name)
-		if self.window:
-			print('Start:', local_time(self.start))
-			print('Stop: ', local_time(self.stop))
+		#if self.window:
+		#	print('Start:', local_time(self.start))
+		#	print('Stop: ', local_time(self.stop))
 		if self.freq:
 			print('Freq: ', fmt_time(self.freq))
 		print('Path: ', self.path)
 		print('Reqs: ', self.reqs)
 		print('in_window:', self.in_window())
+
 
 	def running(self):
 		"Check if process is already running."
@@ -130,35 +170,79 @@ class Scheduler:
 		# Search system wide
 		# return ps_running(self.path)
 
-	def calc_window(self):
+
+	def calc_date(self):
+		"Get seconds until next date when allowed to run"
 		inf = float("inf")
-		cur = seconds_since_midnight()
-		midnight = time.time() - cur
-		# Find earliest start
 		new_start = inf
 		new_stop = 0
-		for start, stop in self.window:
-			# print('calc_window', lmap(fmt_time, cur, start, stop))
-			# if start >= cur and start < new_start:
+		for sd, ed, cycle in self.date_window:
+			if cycle == 'year':
+				if dada.now() > ed:
+					sd = sd.replace(year=sd.year+1)
+					ed = ed.replace(year=ed.year+1)
+				start = sd.timestamp()
+				stop = ed.timestamp()
+			else:
+				start = get_day(sd, cycle).timestamp()
+				stop = get_day(ed, cycle).timestamp()
 			if start < new_start:
 				new_start = start
 				new_stop = stop
-				if stop < start:        # ex: 11pm-1am
-					new_stop = stop + 86400
-		if new_start < inf:
-			self.start = midnight + new_start
-			self.stop = midnight + new_stop
+		return new_start, new_stop
+
+
+	def calc_window(self):
+		"Calculate the next start and stop window for the proc in unix time"
+		print("\n\ncalc_window:", self.name)
+		inf = float("inf")
+		now = time.time()
+		midnight = round(now - seconds_since_midnight())
+		if self.date_window:
+			self.start, self.stop = self.calc_date()
+		else:
+			self.start = midnight
+			self.stop = midnight
+
+		def get_first():
+			"Find earliest start, return True if updated."
+			new_start = inf
+			for start, stop in self.window:
+				start += self.start
+				stop += self.stop
+				if start < new_start and stop > now:
+					new_start = start
+					new_stop = stop
+			if new_start < inf:
+				self.start = new_start
+				self.stop = new_stop
+				return True
+			return False
+
+		if self.window:
+			if not get_first():
+				self.start += 86400
+				self.stop += 86400
+				get_first()
+		else:
+			self.stop += 86400
+
+		if self.stop < self.start:        # ex: 11pm-1am
+			self.stop += 86400
+		print('Start:', local_time(self.start))
+		print('Stop :', local_time(self.stop))
+
 
 	def in_window(self):
-		cur = time.time()
-		if cur < self.start:
+		now = time.time()
+		if now < self.start:
 			return False
-		if self.start <= cur <= self.stop:
+		if self.start <= now <= self.stop:
 			if not self.freq and self.start <= self.last_run <= self.stop:
 				# print("Already ran in this window")
 				return False
 			return True
-		if cur > self.stop:
+		if now > self.stop:
 			# Recalculate
 			self.calc_window()
 			return False
@@ -205,7 +289,7 @@ class Scheduler:
 def read_schedule(schedule_apps, schedule_file):
 	"Read the schedule file:"
 	new_sched = []
-	headers = "days time frequency reqs path".split()
+	headers = "time frequency date reqs path".split()
 	for line in read_csv(schedule_file, headers=headers, delimiter=("\t", " " * 4), merge=True):
 		print('\n\nline =', repr(line))
 		if not all(line.values()):
@@ -239,7 +323,7 @@ def parse_args():
 						nargs='?',
 						help="Filename to read schedule from.")
 
-	parser.add_argument('--polling-rate', default=1,
+	parser.add_argument('--polling', dest='polling_rate', default=1,
 						nargs='?', type=float,
 						help="How often to check (minutes)")
 
@@ -286,9 +370,9 @@ def main(args):
 		if counter:
 			missing = msleep(sleep_time)
 			if missing:
-				if missing > 5:
+				if missing > 2:
 					print("Unaccounted for time during sleep:", fmt_time(missing))
-				# loop again to avoid edge case where the machine wakes up and is immediately put back to sleep
+				# Loop again to avoid edge case where the machine wakes up and is immediately put back to sleep
 				total_idle = float(shell('xprintidle')) / 1000
 				timestamp = time.time()
 				continue
@@ -357,7 +441,7 @@ if __name__ == "__main__":
 		BATTERY = BatteryWatcher()
 	except ValueError:
 		print("Battery monitoring will not work.")
-		class BatteryWatcher:
+		class BatteryWatcher:		# pylint: disable=function-redefined
 			def is_plugged(self):
 				return True
 		BATTERY = BatteryWatcher()
