@@ -28,7 +28,7 @@ def sorted_array(array, column=-1, reverse=False):
 		yield array[index]
 
 
-def print_columns(args, col_width=20, columns=None, just='left', space=0, wrap=True):
+def print_columns(args, col_width=20, columns=None, just='left', space=0, wrap=True):	# pylint: disable=W0621
 	'''Print columns of col_width size.
 	columns = manual list of column widths
 	just = justification: left, right or center'''
@@ -74,7 +74,7 @@ def print_columns(args, col_width=20, columns=None, just='left', space=0, wrap=T
 		print_columns(line, col_width, columns, just, space, wrap=False)
 
 
-def auto_columns(array, space=4, manual=None, printme=True, wrap=0, crop=[]):
+def auto_columns(array, space=4, manual=None, printme=True, wrap=0, crop=None):		# pylint: disable=W0621
 	'''Automatically adjust column size
 	Takes in a 2d array and prints it neatly
 	space = spaces between columns
@@ -172,6 +172,18 @@ def percent(num, digits=0):
 		return sig(num * 100, digits) + '%'
 
 
+def sig(num, digits=3):
+	"Return number formatted for significant digits (formerly get_significant)"
+	ret = ("{0:." + str(digits) + "g}").format(num)
+	if 'e' in ret:
+		if abs(num) >= 1:
+			return str(int(num))
+		else:
+			return str(num)
+	else:
+		return ret
+
+
 class DebugSetup:
 	'''Print a timestamp, time since start, calling
 	function and debuging information about variables
@@ -188,7 +200,7 @@ class DebugSetup:
 	def debug(self, *args, level=1, **kargs):
 		'''breaks = line breaks before output
 		Usage: debug(*message)'''
-		if not level >= self.level:
+		if level < self.level:
 			return
 
 		out = []
@@ -209,7 +221,6 @@ class DebugSetup:
 				out += [typ, arg]
 			else:
 				out += [arg]
-		# todo print dictionaries longer than a single line
 
 		# Clock
 		if show_clock:
@@ -232,7 +243,7 @@ debug = DebugSetup(level=1).debug       # pylint: disable=C0103
 
 def debug_pass(*args, **kargs):         # pylint: disable=unused-argument
 	"Drop in replacement to disable debug lines"
-	pass
+	pass	# pylint: disable=unnecessary-pass
 
 
 def list_get(lis, index, default=''):
@@ -283,7 +294,7 @@ def trailing_avg(lis, power=0.5):
 	return total / weights
 
 
-def add_date(date, years = 0, months = 0, days = 0):
+def add_date(date, years=0, months=0, days=0):
 	"Add a number of years, months, days to date object"
 	if days:
 		date += datetime.timedelta(days=days)
@@ -356,7 +367,7 @@ def udate(text):
 		if len(text) >= 2:
 			text = text.rstrip('s')
 		new = match_conversion(text, days)
-		if new != None:
+		if new is not None:
 			return (count - 1) * 7 + new, 'week'
 
 	# March 3
@@ -450,8 +461,8 @@ def flatten(tree):
 	return out
 
 
-def quickrun(*cmd, check=False, encoding='utf-8', errors='replace', mode='w', input=None,
-			 verbose=0, testing=False, ofile=None, trifecta=False, hidewarning = False, **kargs):
+def quickrun(*cmd, check=False, encoding='utf-8', errors='replace', mode='w', input=None,	# pylint: disable=W0622
+			 verbose=0, testing=False, ofile=None, trifecta=False, hidewarning=False, **kargs):
 	'''Run a command, list of commands as arguments or any combination therof and return
 	the output is a list of decoded lines.
 	check    = if the process exits with a non-zero exit code then quit
@@ -541,18 +552,6 @@ class DotDict(dict):
 	def __delitem__(self, key):
 		super(DotDict, self).__delitem__(key)
 		del self.__dict__[key]
-
-
-def sig(num, digits=3):
-	"Return number formatted for significant digits (formerly get_significant)"
-	ret = ("{0:." + str(digits) + "g}").format(num)
-	if 'e' in ret:
-		if abs(num) >= 1:
-			return str(int(num))
-		else:
-			return str(num)
-	else:
-		return ret
 
 
 def bisect_small(lis, num):
@@ -986,14 +985,18 @@ def search_list(expr, the_list, getfirst=False, func='match', ignorecase=True, s
 			expr = expr.lower()
 		if func in ('in', 'search'):
 			if ignorecase:
-				def searcher(expr, item): return expr in item.lower()   # pylint: disable=E0102
+				def searcher(expr, item):		  # pylint: disable=E0102
+					return expr in item.lower()
 			else:
-				def searcher(expr, item): return expr in item           # pylint: disable=E0102
+				def searcher(expr, item):		  # pylint: disable=E0102
+					return expr in item
 		elif func == 'match':
 			if ignorecase:
-				def searcher(expr, item): return item.lower().startswith(expr)  # pylint: disable=E0102
+				def searcher(expr, item):		  # pylint: disable=E0102
+					return item.lower().startswith(expr)
 			else:
-				def searcher(expr, item): return item.startswith(expr)          # pylint: disable=E0102
+				def searcher(expr, item):		  # pylint: disable=E0102
+					return item.startswith(expr)
 		else:
 			# Could have nested these, but this is faster.
 			raise ValueError("Unknown search type:", func)
@@ -1157,7 +1160,7 @@ def check_install(*programs, msg=''):
 		sys.exit(1)
 
 
-def indenter(*args, header='', level=0, tab=4, wrap=0, even=False):
+def indenter(*args, header='', level=0, tab=4, wrap=0, even=False):			# pylint: disable=W0621
 	"Break up text into tabbed lines. Wrap at max characters. 0 = Don't wrap"
 
 	if type(tab) == int:
@@ -1290,5 +1293,5 @@ def warn(*args, header="\n\nWarning:", delay=1 / 64):
 &&&&&%(((*.*... . .*,.   .           .*%%#(,.          .    .*,. ..,.,,**/(%#&%%
 
 Generated by https://github.com/SurpriseDog/Star-Wrangler
-2021-05-12
+2021-05-13
 '''
