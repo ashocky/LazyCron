@@ -4,13 +4,13 @@
 # Exit 0 if device not busy
 # Usage ./how_busy folder_name
 
-import sys
 import re
-import itertools
-import time
 import os
+import sys
+import time
+import itertools
 
-from sd_common import quickrun as qrun, percent, avg, auto_cols, flatten
+from sd_common import quickrun as qrun, percent, avg, auto_columns as auto_cols, flatten
 from sd_common import sorted_array, check_install, list_get
 
 def is_device_busy(dev, wait=2, reps=4, verbose=0):

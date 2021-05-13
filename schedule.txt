@@ -1,24 +1,29 @@
-# Usage Notes:
-# This is a tab delimited file. Make sure you have actual tabs enabled in your text editor
-# (or at least use 4 spaces between fields)
+# Edit the rows below in the Examples section with your own scripts.
+
+
+
+# "Time" is the window is when the script is allowed to run. You can have multiple windows separated with commas.
+# Example: 1-3am, 2pm-4m, 11:30-11:34 - Play around with these numbers, the system is very flexible. When you run my script it will show you the next time window available for each program.
+
+# "Frequency" is how often the program. m = minutes, h = hours and so on. My script should allow most natural language inputs here. Time towards frequency is only counted when the computer is actively in use. Set as * and it will only run once a day.
+
+# "Date" field is usually set as a range to limit it to run on certain days of the week:
+# Example: m-f, every 2nd Thursday
+
 # Use * for fields that you don't need to fill in.
-
-# "Time" is the window is when the script is allowed to run. You can have multiple windows separated with commas. For example: 1-3am, 2pm-4m, 11:30-11:34 - Play around with these numbers, the system is very flexible. When you run my script it will show you the next time window available for each program.
-
-# "Frequency" is how often the program. m = minutes, h = hours and so on. My script should allow most natural language inputs here. Set as * and it will only run once a day.
-
-# "Date" field can limit it to run on certain days of the week:
-Example m-f, every 2nd Thursday
 
 # Requirements is a comma separated list of additional requirements needed for the script to run. Available ones are as follows:
 #     idle    = Time the computer has been idle for
 #     plugged = Power cord must be attached
 #     closed  = Lid must be closed
-#     random  = Script will run randomly. On average it will run every so many minutes.
+#     random  = Script will run randomly. Example: random 8h will (on average) run every 8 hours. Some days it will run 3+ times, other days not at all.
 
 
 
-#Examples:
+
+# Examples:
+# A list of examples is presented below. The path in each example has a # before it to ensure it won't actually run.
+# The columns are tab delimited, so it's better if you set your text editor to write actual tabs between columns. Spaces will also work with a minimum of 4 spaces between columns.
 
 #Time              Frequency     Date              Requirements            Script Path
 8:30pm-3am         1h            sat-sun           idle 5m, plugged        # ./backup_script_path_goes_here.sh
@@ -28,4 +33,4 @@ Example m-f, every 2nd Thursday
 *                  *             March 14          *                       # ./pi_day.py
 
 
-# Not sure if your schedule will work correctly? Run the program with the --testing option to show what it would do. or just put a # before each script path.
+# Not sure if your schedule will work correctly? Run the program with the --testing option or just put a # before each script path to show what it would do.

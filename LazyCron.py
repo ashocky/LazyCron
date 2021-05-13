@@ -14,12 +14,11 @@ from datetime import datetime as dada
 from battery_watcher import BatteryWatcher
 from how_busy import all_disk_usage, get_network_usage
 
-
-from common import warn, indenter, check_install, mkdir, convert_ut_range, rint
-from common import local_time, convert_user_time, spawn, safe_filename, msleep
-from common import search_list, error, gohome, read_csv, read_state, itercount
-from common import argfixer, seconds_since_midnight, fmt_time, Eprinter
-from common import DotDict, joiner, quickrun, shell, tman, udate, add_date
+from sd_common import warn, indenter, check_install, mkdir, convert_ut_range, rint
+from sd_common import local_time, convert_user_time, spawn, safe_filename, msleep
+from sd_common import search_list, error, gohome, read_csv, read_state, itercount
+from sd_common import argfixer, seconds_since_midnight, fmt_time, Eprinter
+from sd_common import DotDict, joiner, quickrun, shell, tman, udate, add_date
 
 
 def is_busy(max_net=100, max_disk=1):
@@ -65,7 +64,7 @@ def get_day(day, cycle):
 		return date
 	else:
 		error('cycle', cycle, "unsupported")
-	return (today + delta)
+	return today + delta
 
 
 ################################################################################
@@ -75,22 +74,24 @@ class Scheduler:
 
 	def __init__(self, args):
 		"Defaults:"
-		self.start = 0              # Start time, 0 = midnight
-		self.stop = 0               # End time
+		self.window = []            # Start and stop times
+		self.date_window = []       # Allowed days
+		self.start = 0              # Start time in UTC
+		self.stop = 0               # End time in UTC
+		self.freq = 0               # Frequency
+		self.history = []           # When the app last ran
+
 		self.last_elapsed = 0       # Last elapsed time at run
 		self.last_run = 0           # Last time the script was run
 		self.next_elapsed = 0       # Next run time
-		self.window = []            # Start and stop times
-		self.date_window = []       # Allowed days
-		self.freq = 0               # Frequency
+
+		self.args = args            # Preserve initial setup args
 		self.path = args['path']    # Path to script
 		self.thread = None          # Thread starting running process
-		self.history = []           # When the app last ran
 		self.log_dir = 'logs'
 		mkdir(self.log_dir)
 		self.name = list(indenter(os.path.basename(self.path), wrap=64))[0]
 
-		self.args = args            # Preserve initial setup args
 		self.process_reqs()         # Process csv list of requirements
 		self.calc_window()
 
@@ -184,8 +185,9 @@ class Scheduler:
 				start = sd.timestamp()
 				stop = ed.timestamp()
 			else:
-				start = get_day(sd, cycle).timestamp()
+				#start = get_day(sd, cycle).timestamp()
 				stop = get_day(ed, cycle).timestamp()
+				start = stop - (ed - sd) * 86400
 			if start < new_start:
 				new_start = start
 				new_stop = stop
@@ -208,6 +210,8 @@ class Scheduler:
 			"Find earliest start, return True if updated."
 			new_start = inf
 			for start, stop in self.window:
+				if stop < start: 				# ex: 11pm-1am
+					stop += 86400
 				start += self.start
 				stop += self.stop
 				if start < new_start and stop > now:
@@ -227,13 +231,13 @@ class Scheduler:
 		else:
 			self.stop += 86400
 
-		if self.stop < self.start:        # ex: 11pm-1am
-			self.stop += 86400
-		print('Start:', local_time(self.start))
-		print('Stop :', local_time(self.stop))
+
+		print('Start:', local_time(self.start, '%a %m-%d %I:%M %p'), 'in', fmt_time(self.start - now))
+		print('Stop :', local_time(self.stop, '%a %m-%d %I:%M %p'), 'in', fmt_time(self.stop - now))
 
 
 	def in_window(self):
+		"Check if within time window to run, otherwise recalculate a new time window"
 		now = time.time()
 		if now < self.start:
 			return False
@@ -242,7 +246,7 @@ class Scheduler:
 				# print("Already ran in this window")
 				return False
 			return True
-		if now > self.stop:
+		else:
 			# Recalculate
 			self.calc_window()
 			return False
@@ -273,6 +277,8 @@ class Scheduler:
 		filename = safe_filename(self.name + '.' + str(int(time.time())) + '.log')
 		log_file = os.path.abspath(os.path.join(self.log_dir, filename))
 		self.history.append(int(time.time()))
+		if self.path.lstrip().startswith('#'):
+			testing_mode = True
 		if testing_mode:
 			text = "Did not start process:"
 		else:
@@ -317,7 +323,7 @@ def read_schedule(schedule_apps, schedule_file):
 def parse_args():
 	'''Parse arguments'''
 	parser = argparse.ArgumentParser(allow_abbrev=True, usage='%(prog)s [options]',
-					 description='Monitor the system for idle states and run scripts at the best time.')
+	description='Monitor the system for idle states and run scripts at the best time.')
 
 	parser.add_argument('schedule', default='schedule.txt',
 						nargs='?',
@@ -435,7 +441,7 @@ if __name__ == "__main__":
 	UA = parse_args()
 
 	# Min level to print messages:
-	print = Eprinter(verbose=1 - UA.verbose).eprint     # pylint: disable=W0622
+	print = Eprinter(verbose=1 - UA.verbose).eprint     # pylint: disable=W0622,C0103
 	# Workaround for desktop computers:
 	try:
 		BATTERY = BatteryWatcher()

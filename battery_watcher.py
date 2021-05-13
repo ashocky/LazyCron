@@ -8,7 +8,7 @@ import sys
 import os
 
 from sd_common import local_time, trailing_avg, chunker, read_file
-from sd_common import msleep, pmsleep, Eprinter, eprint, error, read_val, list_get
+from sd_common import msleep, pmsleep, Eprinter, eprint, read_val, list_get
 from sd_common import fmt_time, debug_pass as debug, warn
 
 
@@ -68,6 +68,7 @@ class BatteryWatcher:
 				rates.append(time_delta / power_delta)
 			eprint(list(map(int, rates)), '=', int(trailing_avg(rates)))
 			return trailing_avg(rates)
+		return None
 
 	def time_left(self, target, update=True):
 		"Estimate seconds until power level will reach target"
