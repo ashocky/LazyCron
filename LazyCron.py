@@ -428,14 +428,14 @@ def main(args):
 					if not results:
 						print("Going to sleep\n")
 						if not testing_mode:
-							shell("systemctl suspend")
+							quickrun('systemctl', 'suspend')
 					else:
 						print("Too busy to sleep")
 			else:
 				# Battery Mode doesn't wait for idle system.
 				print("Idle and unplugged. Going to sleep.")
 				if not testing_mode:
-					shell("systemctl suspend")
+					quickrun('systemctl', 'suspend')
 
 
 
