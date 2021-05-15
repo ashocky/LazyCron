@@ -280,12 +280,12 @@ class Scheduler:
 
 		filename = safe_filename(self.name + '.' + str(int(time.time())) + '.log')
 		log_file = os.path.abspath(os.path.join(self.log_dir, filename))
-		self.history.append(int(time.time()))
 		if self.path.lstrip().startswith('#'):
 			testing_mode = True
 		if testing_mode:
 			text = "Did not start process:"
 		else:
+			self.history.append(int(time.time()))
 			text = "Started process:"
 			dirname = os.path.dirname(self.path)
 			if not os.path.exists(dirname):
