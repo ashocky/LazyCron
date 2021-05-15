@@ -153,10 +153,11 @@ class Scheduler:
 	def print(self):
 		"Print a detailed representation of each app"
 
-		print(self.name)
-		#if self.window:
-		#	print('Start:', local_time(self.start))
-		#	print('Stop: ', local_time(self.stop))
+		print('Name: ', self.name)
+		if self.window:
+			now = time.time()
+			print('Start:', local_time(self.start, '%a %m-%d %I:%M %p'), '=', fmt_time(self.start - now))
+			print('Stop: ', local_time(self.stop, '%a %m-%d %I:%M %p'), '=', fmt_time(self.stop - now))
 		if self.freq:
 			print('Freq: ', fmt_time(self.freq))
 		print('Path: ', self.path)
@@ -196,7 +197,6 @@ class Scheduler:
 
 	def calc_window(self):
 		"Calculate the next start and stop window for the proc in unix time"
-		print("\n\ncalc_window:", self.name)
 		inf = float("inf")
 		now = time.time()
 		midnight = round(now - seconds_since_midnight())
@@ -231,9 +231,13 @@ class Scheduler:
 		else:
 			self.stop += 86400
 
-
-		print('Start:', local_time(self.start, '%a %m-%d %I:%M %p'), 'in', fmt_time(self.start - now))
-		print('Stop :', local_time(self.stop, '%a %m-%d %I:%M %p'), 'in', fmt_time(self.stop - now))
+		if self.history and (self.window or self.date_window):
+			if self.start > now:
+				print("Next run of", self.name, 'in', fmt_time(self.start - now))
+			else:
+				print("Time window for", self.name, 'closes in', fmt_time(self.stop - now))
+		#print('Start:', local_time(self.start, '%a %m-%d %I:%M %p'), 'in', fmt_time(self.start - now))
+		#print('Stop :', local_time(self.stop, '%a %m-%d %I:%M %p'), 'in', fmt_time(self.stop - now))
 
 
 	def in_window(self):
@@ -297,20 +301,18 @@ def read_schedule(schedule_apps, schedule_file):
 	new_sched = []
 	headers = "time frequency date reqs path".split()
 	for line in read_csv(schedule_file, headers=headers, delimiter=("\t", " " * 4), merge=True):
-		print('\n\nline =', repr(line))
+		print('\n\nData =', repr(line))
 		if not all(line.values()):
 			warn("Empty columns must have a * in them")
 			continue
 		if len(line) >= 3:
 			for proc in schedule_apps:
 				if line == proc.args:
-					# print("\nSkipping already loaded app:", proc.name)
 					new_sched.append(proc)
 					break
 			else:
 				proc = Scheduler(line)
 				proc.print()
-				print("Loading updated app:", proc.name)
 				new_sched.append(proc)
 		else:
 			print("Could not process:", line)
@@ -345,7 +347,7 @@ def parse_args():
 						help="Do everything, but actually run the scripts.")
 
 	parser.add_argument('--skip', default=False, action='store_true',
-						help="Don't run apps on startup, wait till next occurence.")
+						help="Don't run apps on startup, wait a bit.")
 
 	return parser.parse_args(argfixer())
 
@@ -364,7 +366,7 @@ def main(args):
 
 	sleep_time = polling_rate   # Time to rest at the end of every loop
 	idle = 0                    # Seconds without user inteaction.
-	elapsed = 0                 # Time Computer has spent not idle
+	elapsed = 0                 # Total time Computer has spent not idle
 	total_idle = 0
 	last_idle = 0
 	timestamp = time.time()     # Timestamp at start of loop
@@ -402,14 +404,15 @@ def main(args):
 
 		# Read the schedule file if it's been updated
 		if os.path.getmtime(schedule_file) > last_schedule_read:
-			print("\n\nUpdating schedule file:")
+			if counter:
+				print("\n\nSchedule file updated:")
 			last_schedule_read = time.time()
 			schedule_apps = read_schedule(schedule_apps, schedule_file)
 
 		# Run scripts if enough elapsed time has passed
 		for proc in schedule_apps:
 			if proc.in_window() and proc.next_elapsed <= elapsed:
-				if args.skip and not proc.history:
+				if args.skip and counter < 10:
 					testing = True
 				else:
 					testing = testing_mode
