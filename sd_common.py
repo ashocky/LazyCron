@@ -10,7 +10,6 @@ import csv
 import time
 import queue
 import shutil
-import inspect
 import datetime
 import threading
 import subprocess
@@ -28,7 +27,7 @@ def sorted_array(array, column=-1, reverse=False):
 		yield array[index]
 
 
-def print_columns(args, col_width=20, columns=None, just='left', space=0, wrap=True):	# pylint: disable=W0621
+def print_columns(args, col_width=20, columns=None, just='left', space=0, wrap=True):
 	'''Print columns of col_width size.
 	columns = manual list of column widths
 	just = justification: left, right or center'''
@@ -74,7 +73,7 @@ def print_columns(args, col_width=20, columns=None, just='left', space=0, wrap=T
 		print_columns(line, col_width, columns, just, space, wrap=False)
 
 
-def auto_columns(array, space=4, manual=None, printme=True, wrap=0, crop=None):		# pylint: disable=W0621
+def auto_columns(array, space=4, manual=None, printme=True, wrap=0, crop=None):
 	'''Automatically adjust column size
 	Takes in a 2d array and prints it neatly
 	space = spaces between columns
@@ -172,78 +171,9 @@ def percent(num, digits=0):
 		return sig(num * 100, digits) + '%'
 
 
-def sig(num, digits=3):
-	"Return number formatted for significant digits (formerly get_significant)"
-	ret = ("{0:." + str(digits) + "g}").format(num)
-	if 'e' in ret:
-		if abs(num) >= 1:
-			return str(int(num))
-		else:
-			return str(num)
-	else:
-		return ret
-
-
-class DebugSetup:
-	'''Print a timestamp, time since start, calling
-	function and debuging information about variables
-	Quick setup: from common import DebugSetup; debug = DebugSetup(level=1).debug
-	Disable with: def debug(*args, **kargs): pass'''
-
-	def __init__(self, show_clock=True, breaks=1, show_types=False, level=1):
-		self.start = time.time()        # Start time
-		self.show_clock = show_clock    # Print clock on left side
-		self.breaks = breaks            # Line breaks before printing
-		self.show_types = show_types    # Show types of each variable
-		self.level = level              # Don't show messages >= this level
-
-	def debug(self, *args, level=1, **kargs):
-		'''breaks = line breaks before output
-		Usage: debug(*message)'''
-		if level < self.level:
-			return
-
-		out = []
-		timer = time.time() - self.start
-		show_clock = kargs.get('show_clock', self.show_clock)
-		breaks = kargs.get('breaks', self.breaks)
-		show_types = kargs.get('show_types', self.show_types)
-
-		# Show type(arg) and formatted value
-		for arg in args:
-			if show_types:
-				if type(arg) == str:
-					out += [repr(arg)]
-					continue
-				typ = '<' + re.split("'", str(type(arg)))[-2] + '>'
-				if type(arg) == int or type(arg) == float:
-					arg = sig(arg)
-				out += [typ, arg]
-			else:
-				out += [arg]
-
-		# Clock
-		if show_clock:
-			out = [time.strftime('%H:%M', time.localtime())] + out
-
-		# Timer
-		if timer < 3600:
-			timer = '+' + sig(timer)
-		else:
-			timer = '+' + fmt_time(timer, pretty=False)
-		out = [timer, inspect.stack()[1].function] + out
-
-		# Print to stderr
-		print('\n' * breaks, file=sys.stderr, end='')
-		print(*out, file=sys.stderr)
-
-
-debug = DebugSetup(level=1).debug       # pylint: disable=C0103
-
-
 def debug_pass(*args, **kargs):         # pylint: disable=unused-argument
 	"Drop in replacement to disable debug lines"
-	pass	# pylint: disable=unnecessary-pass
+	pass    # pylint: disable=unnecessary-pass
 
 
 def list_get(lis, index, default=''):
@@ -312,7 +242,6 @@ def udate(text):
 	Per convention with datetime, weeks start on monday
 	'''
 	text = str(text).strip().lower()
-	source = text
 	digits = sum([char.isdigit() for char in text])
 
 	#Extract count (if available)
@@ -554,6 +483,18 @@ class DotDict(dict):
 		del self.__dict__[key]
 
 
+def sig(num, digits=3):
+	"Return number formatted for significant digits (formerly get_significant)"
+	ret = ("{0:." + str(digits) + "g}").format(num)
+	if 'e' in ret:
+		if abs(num) >= 1:
+			return str(int(num))
+		else:
+			return str(num)
+	else:
+		return ret
+
+
 def bisect_small(lis, num):
 	'''Given a sorted list, returns the index of the biggest number smaller than num
 	Unlike bisect will never return an index which doesn't exist'''
@@ -665,9 +606,9 @@ def seconds_since_midnight(seconds=None):
 def argfixer():
 	'''Fix up args for argparse. Lowers case and turns -args into --args'''
 	out = []
-	sys.argv = [word.lower() for word in sys.argv]
 	for word in sys.argv:
-		word = word.lower()
+		if word.startswith('-'):
+			word = word.lower()
 		if re.match('^-[^-]', word):
 			out.append('-' + word)
 		else:
@@ -772,7 +713,7 @@ def read_csv(filename, ignore_comments=True, cleanup=True, headers=None, merge=F
 	cleanup = remove quotes and fix numbers
 	headers = instead of a list return a dict with headers as keys for columns
 	delimiter = seperator between columns.
-		If you provide a list it will try each one in turn, but the first option must be a single character
+	If you provide a list it will try each one in turn, but the first option must be a single character
 	merge = merge repeated delimiter'''
 
 	def clean(row):
@@ -787,7 +728,6 @@ def read_csv(filename, ignore_comments=True, cleanup=True, headers=None, merge=F
 				item.strip("'")
 			if item.startswith('"') and item.endswith('"'):
 				item.strip('"')
-
 
 			# Check if its a number
 			if item.lstrip('-').replace('.', '', 1).isdigit():
@@ -824,6 +764,7 @@ def read_csv(filename, ignore_comments=True, cleanup=True, headers=None, merge=F
 			else:
 				for d in delimiter[1:]:
 					if d in line:
+						#??? https://www.python.org/dev/peps/pep-0479/
 						row = next(csv.reader([line.replace(d, delimiter[0])], delimiter=delimiter[0], **kargs))
 						print("Using backup delimiter to read line:", repr(d))
 						break
@@ -833,21 +774,11 @@ def read_csv(filename, ignore_comments=True, cleanup=True, headers=None, merge=F
 			if row:
 				if merge:
 					# Eliminate empty columns
-					copy = row.copy()
-					row = []
-					for item in copy:
-						if item:
-							row.append(item)
+					row = [item for item in row if item]
 				if not ignore_comments:
 					yield get_headers(clean(row))
 				elif not row[0].startswith('#'):
 					yield get_headers(clean(row))
-
-
-		'''
-		csv_reader = csv.reader(f, **kargs)
-		for row in csv_reader:
-		'''
 
 
 def gohome():
@@ -985,17 +916,17 @@ def search_list(expr, the_list, getfirst=False, func='match', ignorecase=True, s
 			expr = expr.lower()
 		if func in ('in', 'search'):
 			if ignorecase:
-				def searcher(expr, item):		  # pylint: disable=E0102
+				def searcher(expr, item): 	      # pylint: disable=E0102
 					return expr in item.lower()
 			else:
-				def searcher(expr, item):		  # pylint: disable=E0102
+				def searcher(expr, item): 		  # pylint: disable=E0102
 					return expr in item
 		elif func == 'match':
 			if ignorecase:
-				def searcher(expr, item):		  # pylint: disable=E0102
+				def searcher(expr, item): 		  # pylint: disable=E0102
 					return item.lower().startswith(expr)
 			else:
-				def searcher(expr, item):		  # pylint: disable=E0102
+				def searcher(expr, item): 		  # pylint: disable=E0102
 					return item.startswith(expr)
 		else:
 			# Could have nested these, but this is faster.
@@ -1125,7 +1056,7 @@ def convert_ut_range(unum, **kargs):
 				if unum[x].endswith(unit):
 					value = convert_user_time(unum[x].strip('pm').strip('am'))
 				else:
-					if value != None and convert_user_time(unum[x]) < value:
+					if value is not None and convert_user_time(unum[x]) < value:
 						continue
 					unum[x] = unum[x] + unit
 	return [convert_user_time(item, **kargs) for item in unum]
@@ -1160,7 +1091,7 @@ def check_install(*programs, msg=''):
 		sys.exit(1)
 
 
-def indenter(*args, header='', level=0, tab=4, wrap=0, even=False):			# pylint: disable=W0621
+def indenter(*args, header='', level=0, tab=4, wrap=0, even=False):
 	"Break up text into tabbed lines. Wrap at max characters. 0 = Don't wrap"
 
 	if type(tab) == int:
@@ -1169,7 +1100,7 @@ def indenter(*args, header='', level=0, tab=4, wrap=0, even=False):			# pylint: 
 	words = (' '.join(map(str, args))).split(' ')
 
 	lc = float('inf')       # line count
-	for wrap in range(wrap, -1, -1):
+	for cut in range(wrap, -1, -1):
 		out = []
 		line = ''
 		count = 0
@@ -1179,7 +1110,7 @@ def indenter(*args, header='', level=0, tab=4, wrap=0, even=False):			# pylint: 
 			else:
 				new = header + word
 			count += 1
-			if wrap and len(new.replace('\t', ' ' * 4)) > wrap:
+			if cut and len(new.replace('\t', ' ' * 4)) > cut:
 				out.append(line)
 				line = header + word
 			else:
@@ -1293,5 +1224,5 @@ def warn(*args, header="\n\nWarning:", delay=1 / 64):
 &&&&&%(((*.*... . .*,.   .           .*%%#(,.          .    .*,. ..,.,,**/(%#&%%
 
 Generated by https://github.com/SurpriseDog/Star-Wrangler
-2021-05-13
+2021-05-16
 '''
