@@ -90,7 +90,7 @@ class Scheduler:
 		self.thread = None          # Thread starting running process
 		self.log_dir = 'logs'
 		mkdir(self.log_dir)
-		self.name = list(indenter(os.path.basename(self.path), wrap=64))[0]
+		self.name = list(indenter(os.path.basename(self.path), wrap=64))[0].rstrip(',')
 
 		self.process_reqs()         # Process csv list of requirements
 		self.calc_window()
