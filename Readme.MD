@@ -15,6 +15,8 @@ Requirements is a comma separated list of additional requirements needed for the
 
      idle    = Time the computer has been idle for
 
+     busy    = Computer must have been in use within time specified
+
      plugged = Power cord must be attached
 
      closed  = Lid must be closed

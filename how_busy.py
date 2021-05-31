@@ -10,8 +10,8 @@ import sys
 import time
 import itertools
 
-from sd_common import quickrun as qrun, percent, avg, auto_columns as auto_cols, flatten
-from sd_common import sorted_array, check_install, list_get
+from sd_common import avg, qrun, sorted_array, auto_cols, flatten, check_install
+from sd_common import percent, list_get
 
 def is_device_busy(dev, wait=2, reps=4, verbose=0):
 	"Check how busy the device is"

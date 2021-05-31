@@ -3,496 +3,19 @@
 # To see how this file was created visit: https://github.com/SurpriseDog/Star-Wrangler
 # Written by SurpriseDog at: https://github.com/SurpriseDog
 
-import os
 import re
+import os
 import sys
 import csv
 import time
+import math
 import queue
 import shutil
-import datetime
+import argparse
 import threading
 import subprocess
-from collections import Counter
 from urllib.parse import urlparse
 from shutil import get_terminal_size
-from datetime import datetime as dada
-
-
-def sorted_array(array, column=-1, reverse=False):
-	"Return sorted 2d array line by line"
-	pairs = [(line[column], index) for index, line in enumerate(array)]
-	for _val, index in sorted(pairs, reverse=reverse):
-		# print(index, val)
-		yield array[index]
-
-
-def print_columns(args, col_width=20, columns=None, just='left', space=0, wrap=True):
-	'''Print columns of col_width size.
-	columns = manual list of column widths
-	just = justification: left, right or center'''
-
-	just = just[0].lower()
-	if not columns:
-		columns = [col_width] * len(args)
-
-	output = ""
-	_col_count = len(columns)
-	extra = []
-	for count, section in enumerate(args):
-		width = columns[count]
-		section = str(section)
-
-		if wrap:
-			lines = None
-			if len(section) > width - space:
-				# print(section, len(section), width)
-				# lines = slicer(section, *([width] * (len(section) // width + 1)))
-				lines = indenter(section, wrap=width - space)
-				if len(lines) >= 2 and len(lines[-1]) <= space:
-					lines[-2] += lines[-1]
-					lines.pop(-1)
-			if '\n' in section:
-				lines = section.split('\n')
-			if lines:
-				section = lines[0]
-				for lineno, line in enumerate(lines[1:]):
-					if lineno + 1 > len(extra):
-						extra.append([''] * len(args))
-					extra[lineno][count] = line
-
-		if just == 'l':
-			output += section.ljust(width)
-		elif just == 'r':
-			output += section.rjust(width)
-		elif just == 'c':
-			output += section.center(width)
-	print(output)
-
-	for line in extra:
-		print_columns(line, col_width, columns, just, space, wrap=False)
-
-
-def auto_columns(array, space=4, manual=None, printme=True, wrap=0, crop=None):
-	'''Automatically adjust column size
-	Takes in a 2d array and prints it neatly
-	space = spaces between columns
-	manual = dictionary of column adjustments made to space variable
-	crop = array of max length for each column, 0 = unlimited
-	example: {-1:2} sets the space variable to 2 for the last column'''
-	if not manual:
-		manual = dict()
-
-	# Convert generators and map objects:
-	array = list(array)
-
-	if crop:
-		out = []
-		for row in array:
-			row = list(row)
-			for index in range(len(row)):
-				line = str(row[index])
-				cut = crop[index]
-				if cut > 3 and len(line) > cut:
-					row[index] = line[:cut-3]+'...'
-			out.append(row)
-		array = out
-
-
-	# Fixed so array can have inconsistently sized rows
-	col_width = {}
-	for row in array:
-		row = list(map(str, row))
-		for col in range(len(row)):
-			length = len(row[col])
-			if length > col_width.get(col, 0):
-				col_width[col] = length
-
-	col_width = [col_width[key] for key in sorted(col_width.keys())]
-	spaces = [space] * len(col_width)
-	spaces[-1] = 0
-
-	# Make any manual adjustments
-	for col, val in manual.items():
-		spaces[col] = val
-
-	col_width = [sum(x) for x in zip(col_width, spaces)]
-
-	# Adjust for line wrap
-	max_width = get_terminal_size().columns     # Terminal size
-	if wrap:
-		max_width = min(max_width, wrap)
-	extra = sum(col_width) - max_width          # Amount columns exceed the terminal width
-
-	def fill_remainder():
-		"After operation to reduce column sizes, use up any remaining space"
-		remain = max_width - sum(col_width)
-		for x in range(len(col_width)):
-			if remain:
-				col_width[x] += 1
-				remain -= 1
-
-	if extra > 0:
-		# print('extra', extra, 'total', total, 'max_width', max_width)
-		# print(col_width, '=', sum(col_width))
-		if max(col_width) > 0.5 * sum(col_width):
-			# If there's one large column, reduce it
-			index = col_width.index(max(col_width))
-			col_width[index] -= extra
-			if col_width[index] < max_width // len(col_width):
-				# However if that's not enough reduce all columns equally
-				col_width = [max_width // len(col_width)] * len(col_width)
-				fill_remainder()
-		else:
-			# Otherwise reduce all columns proportionally
-			col_width = [int(width * (max_width / (max_width + extra))) for width in col_width]
-			fill_remainder()
-		# print(col_width, '=', sum(col_width))
-
-	# Turn on for visual representation of columns:
-	# print(''.join([str(count) * x  for count, x in enumerate(col_width)]))
-
-	if printme:
-		for row in array:
-			print_columns(row, columns=col_width, space=0)
-
-	return col_width
-
-
-def avg(lis):
-	"Average a list"
-	return sum(lis) / len(lis)
-
-
-def percent(num, digits=0):
-	if not digits:
-		return str(int(num * 100)) + '%'
-	else:
-		return sig(num * 100, digits) + '%'
-
-
-def debug_pass(*args, **kargs):         # pylint: disable=unused-argument
-	"Drop in replacement to disable debug lines"
-	pass    # pylint: disable=unnecessary-pass
-
-
-def list_get(lis, index, default=''):
-
-	# Fetch a value from a list if it exists, otherwise return default
-	# Now accepts negative indexes
-	length = len(lis)
-	if -length <= index < length:
-		return lis[index]
-	else:
-		return default
-
-
-def read_val(file):
-	"Read a number from an open file handle"
-	file.seek(0)
-	return int(file.read())
-
-
-def pmsleep(seconds):
-	"Combination of psleep and msleep"
-	print("Sleeping for", fmt_time(seconds, digits=2) + '...', file=sys.stderr)
-	return msleep(seconds)
-
-
-def read_file(filename):
-	"Read an entire file into text"
-	with open(filename, 'r') as f:
-		return f.read()
-
-
-def chunker(lis, lines=2, overlap=False):
-	'''Take a list a return its values n items at a time
-	alternate way: zip(*[iter(lis)]*n)'''
-	step = 1 if overlap else lines
-	for start in range(0, len(lis) - lines + 1, step):
-		yield lis[start:start + lines]
-
-
-def trailing_avg(lis, power=0.5):
-	"Weighted average that biases the last parts of this list more:"
-	total = 0
-	weights = 0
-	for index, num in enumerate(lis):
-		weight = (index + 1)**power
-		total += weight * num
-		weights += weight
-	return total / weights
-
-
-def add_date(date, years=0, months=0, days=0):
-	"Add a number of years, months, days to date object"
-	if days:
-		date += datetime.timedelta(days=days)
-	new_y, new_m = date.year, date.month
-	new_y += (new_m + months - 1) // 12 + years
-	new_m = (new_m + months - 1) % 12 + 1
-	return date.replace(year=new_y, month=new_m)
-
-
-def udate(text):
-	'''
-	Convert a user formatted date into a number of days and length of cycle
-	S = Sunday, Sa = saturday
-	3-7 = days of month, January 9, January 9th, Jan 2nd (throw away 2 digits after number)
-	Per convention with datetime, weeks start on monday
-	'''
-	text = str(text).strip().lower()
-	digits = sum([char.isdigit() for char in text])
-
-	#Extract count (if available)
-	#Example: Every 2nd Tuesday
-	count = 1
-	if digits < len(text):
-		match = re.match('^[0-9][0-9]*', text)
-		if match and len(match.group()) > 0:
-			count = int(match.group())
-			if len(text) <= 4:
-				text = re.sub('^[0-9]*[^ ]{0,2}', '', text)
-			if ' ' in text:
-				text = re.sub('^[0-9]*[^ ]{0,2} ', '', text)
-
-
-	#Count the remaining digits
-	text = text.strip()
-	digits = sum([char.isdigit() for char in text])
-	# print('count', count, 'digits', digits, 'text', text)
-
-	if not text:
-		return count, 'month'
-
-	# Match Tu T = Tuesday
-	if digits == 0 and text:
-		days = dict(
-			m=0,
-			monday=0,
-			munday=0,
-			t=1,
-			tu=1,
-			tuesday=1,
-			tuseday=1,
-			twosday=1,
-			toosday=1,
-			w=2,
-			wednesday=2,
-			wensday=2,
-			r=3,
-			h=3,
-			th=3,
-			thursday=3,
-			thorsday=3,
-			f=4,
-			friday=4,
-			fryday=4,
-			s=5,
-			saturday=5,
-			u=6,
-			sunday=6,
-		)
-		if len(text) >= 2:
-			text = text.rstrip('s')
-		new = match_conversion(text, days)
-		if new is not None:
-			return (count - 1) * 7 + new, 'week'
-
-	# March 3
-	if digits < len(text):
-		day = 1
-		month = time.strptime(text[:3], '%b').tm_mon
-		text = re.sub('^[^0-9]*', '', text).strip()
-		if text:
-			day = int(re.sub('[^0-9]*', '', text))
-		today = dada(*dada.now().timetuple()[:3])
-		return today.replace(month=month, day=day), 'year'
-
-
-	# Just digits
-	return int(text), 'month'
-
-
-class _TmanObj():
-	"Used for ThreadManager"
-
-	def __init__(self, func, *args, delay=0, **kargs):
-		self.start = time.time()
-		self.que, self.thread = spawn(func, *args, delay=delay, **kargs)
-
-	def age(self):
-		return time.time() - self.start
-
-	def is_alive(self):
-		return self.thread.is_alive()
-
-
-class ThreadManager():
-	"Maintain a list of threads and when they were started, query() to see if done."
-
-	def __init__(self):
-		self.threads = dict()
-
-	def query(self, func, *args, delay=0, max_age=0, **kargs):
-		"Start thread if new, return status, que.get()"
-		serial = id(func)
-
-		obj = self.threads.get(serial, None)
-		if max_age and obj and obj.age() > max_age:
-			print("Thread aged out")
-			del obj
-			obj = None
-		if obj and obj.is_alive():
-			print("Can't get results now, we got quilting to do!")
-			return False, None
-		if obj:
-			del self.threads[serial]
-			return True, obj.que.get()
-
-		# print("Starting thread!")
-		obj = _TmanObj(func, *args, delay=delay, **kargs)
-		self.threads[serial] = obj
-		return False, None
-
-	def remove(self, func):
-		"Remove thread if in dict"
-		serial = id(func)
-		if serial in self.threads:
-			del self.threads[serial]
-
-
-tman = ThreadManager()  # pylint: disable=C0103
-
-
-def shell(cmd, **kargs):
-	"Return first line of stdout"
-	return quickrun(cmd, **kargs)[0].strip()
-
-
-def flatten(tree):
-	"Flatten a nested list, tuple or dict of any depth into a flat list"
-	# For big data sets use this: https://stackoverflow.com/a/45323085/11343425
-	out = []
-	if isinstance(tree, dict):
-		for key, val in tree.items():
-			if type(val) in (list, tuple, dict):
-				out += flatten(val)
-			else:
-				out.append({key: val})
-
-	else:
-		for item in tree:
-			if type(item) in (list, tuple, dict):
-				out += flatten(item)
-			else:
-				out.append(item)
-	return out
-
-
-def quickrun(*cmd, check=False, encoding='utf-8', errors='replace', mode='w', input=None,	# pylint: disable=W0622
-			 verbose=0, testing=False, ofile=None, trifecta=False, hidewarning=False, **kargs):
-	'''Run a command, list of commands as arguments or any combination therof and return
-	the output is a list of decoded lines.
-	check    = if the process exits with a non-zero exit code then quit
-	testing  = Print command and don't do anything.
-	ofile    = output file
-	mode     = output file write mode
-	trifecta = return (returncode, stdout, stderr)
-	input	 = stdinput (auto converted to bytes)
-	'''
-	cmd = list(map(str, flatten(cmd)))
-	if len(cmd) == 1:
-		cmd = cmd[0]
-
-	if testing:
-		print("Not running command:", cmd)
-		return []
-
-	if verbose:
-		print("Running command:", cmd)
-		print("               =", ' '.join(cmd))
-
-	if ofile:
-		output = open(ofile, mode=mode)
-	else:
-		output = subprocess.PIPE
-
-	if input:
-		if type(input) != bytes:
-			input = input.encode()
-
-	#Run the command and get return value
-	ret = subprocess.run(cmd, check=check, stdout=output, stderr=output, input=input, **kargs)
-	code = ret.returncode
-	stdout = ret.stdout.decode(encoding=encoding, errors=errors).splitlines() if ret.stdout else []
-	stderr = ret.stderr.decode(encoding=encoding, errors=errors).splitlines() if ret.stderr else []
-
-	if ofile:
-		output.close()
-		return []
-
-	if trifecta:
-		return code, stdout, stderr
-
-	if code and not hidewarning:
-		warn("Process returned code:", code)
-
-	for line in stderr:
-		print(line)
-
-	return stdout
-
-
-def joiner(char, *args):
-	return char.join(map(str, args))
-
-
-class DotDict(dict):
-	'''Example:
-	m = dotdict({'first_name': 'Eduardo'}, last_name='Pool', age=24, sports=['Soccer'])
-	'''
-	# Source: https://stackoverflow.com/questions/2352181/how-to-use-a-dot-to-access-members-of-dictionary
-
-	def __init__(self, *args, **kwargs):
-		super(DotDict, self).__init__(*args, **kwargs)
-		for arg in args:
-			if isinstance(arg, dict):
-				for k, v in arg.items():
-					self[k] = v
-
-		if kwargs:
-			for k, v in kwargs.items():
-				self[k] = v
-
-	def __getattr__(self, attr):
-		return self.get(attr)
-
-	def __setattr__(self, key, value):
-		self.__setitem__(key, value)
-
-	def __setitem__(self, key, value):
-		super(DotDict, self).__setitem__(key, value)
-		self.__dict__.update({key: value})
-
-	def __delattr__(self, item):
-		self.__delitem__(item)
-
-	def __delitem__(self, key):
-		super(DotDict, self).__delitem__(key)
-		del self.__dict__[key]
-
-
-def sig(num, digits=3):
-	"Return number formatted for significant digits (formerly get_significant)"
-	ret = ("{0:." + str(digits) + "g}").format(num)
-	if 'e' in ret:
-		if abs(num) >= 1:
-			return str(int(num))
-		else:
-			return str(num)
-	else:
-		return ret
 
 
 def bisect_small(lis, num):
@@ -506,129 +29,12 @@ def bisect_small(lis, num):
 		return end
 
 
-def fmt_time(num, digits=2, pretty=True, smallest=None, fields=0, **kargs):
-	'''Return a neatly formated time string.
-	pretty example: "9 hours, 12 minutes" vs "9:12"
-	sig         = the number of significant digits.
-	fields      = Instead of siginificant digits, specify the number of date fields to produce.
-	fields overrides digits
-	todo make fields the default?
-	smallest    = smallest units for non pretty printing'''
-	if num < 0:
-		num *= -1
-		return '-' + fmt_time(**locals())
-
-	if 'sig' in kargs:
-		digits = kargs['sig']
-		print("\nWarning! sig is deprecated. Use <digits> instead.\n")
-
-	if pretty:
-		# Return number and unit text
-		if num < 5.391e-44:
-			return "0 seconds"
-		out = []
-		# For calculations involving leap years, use the datetime library:
-		limits = (5.391e-44, 1e-24, 1e-21, 1e-18, 1e-15, 1e-12, 1e-09, 1e-06, 0.001, 1, 60,
-				  3600, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 30.4167, 3600 * 24 * 365.2422)
-		names = (
-			'Planck time',
-			'yoctosecond',
-			'zeptosecond',
-			'attosecond',
-			'femtosecond',
-			'picosecond',
-			'nanosecond',
-			'microsecond',
-			'millisecond',
-			'second',
-			'minute',
-			'hour',
-			'day',
-			'week',
-			'month',
-			'year')
-
-		index = bisect_small(limits, num) + 1
-		while index > 0 and (digits > 0 or fields > 0):
-			index -= 1
-			unit = limits[index]
-			u_num = num / unit          # example: 3.7122314232145 (days)
-			name = names[index]
-
-			if name == 'week' and u_num < 2:
-				# Replace weeks with days when less than 2 weeks
-				digits -= 1
-				continue
-			if u_num < 1:
-				# Avoids the "3 minutes, 2 nanoseconds" nonsense.
-				if name in ('second', 'minute', 'hour', 'week', 'month'):
-					digits -= 2
-				else:
-					digits -= 3
-				continue
-
-			fields -= 1
-			if num >= 60 or fields:     # Minutes or higher
-				u_num = int(u_num)
-				out += [str(u_num) + ' ' + name + ('s' if u_num != 1 else '')]
-				digits -= len(str(u_num))
-				num -= u_num * unit
-			else:               # Seconds or lower
-				d = digits if digits >= 1 else 1
-				out += [sig(u_num, d) + ' ' + name + ('s' if u_num != 1 else '')]
-				break
-		return ', '.join(out)
-
-	else:
-		# Normal "2:40" style format
-		num = int(num)
-		s = str(datetime.timedelta(seconds=num))
-		if num < 3600:
-			s = s[2:]  # .lstrip('0')
-
-		# Strip smaller units
-		if smallest == 'minutes' or (not smallest and num >= 3600):
-			return s[:-3]
-		elif smallest == 'seconds' or not smallest:
-			return s
-		elif smallest == 'hours':
-			return s[:-6] + ' hours'
-
-
-def seconds_since_midnight(seconds=None):
-	if seconds:
-		tim = time.localtime(seconds)
-	else:
-		tim = time.localtime()
-	return tim.tm_hour * 3600 + tim.tm_min * 60 + tim.tm_sec + time.time() % 1
-
-
-def argfixer():
-	'''Fix up args for argparse. Lowers case and turns -args into --args'''
-	out = []
-	for word in sys.argv:
-		if word.startswith('-'):
-			word = word.lower()
-		if re.match('^-[^-]', word):
-			out.append('-' + word)
-		else:
-			out.append(word)
-	return out[1:]
-
-
-def itercount(start=0, step=1):
-	"Save an import itertools"
-	x = start
-	while True:
-		yield x
-		x += step
-
-
 def dict_valtokey(dic, val):
 	"Take a dictionary value and return the first key found:"
 	for k, v in dic.items():
 		if val == v:
 			return k
+	return None
 
 
 def read_state(filename, multiline=False, forget=False, verbose=True, cleanup_age=86400):
@@ -707,6 +113,217 @@ def read_state(filename, multiline=False, forget=False, verbose=True, cleanup_ag
 		return f.readline().strip()
 
 
+def search_list(expr, the_list, getfirst=False, func='match', ignorecase=True, searcher=None):
+	'''Search for expression in each item in list (or dictionary!)
+	getfirst = Return the first value found, otherwise None
+	searcher = Custom lamda function'''
+
+	if not searcher:
+		# func = dict(search='in').get('search', func)
+		# Avoiding regex now in case substring has a regex escape character
+		if ignorecase:
+			expr = expr.lower()
+		if func in ('in', 'search'):
+			if ignorecase:
+				def searcher(expr, item): 	      # pylint: disable=E0102
+					return expr in item.lower()
+			else:
+				def searcher(expr, item): 		  # pylint: disable=E0102
+					return expr in item
+		elif func == 'match':
+			if ignorecase:
+				def searcher(expr, item): 		  # pylint: disable=E0102
+					return item.lower().startswith(expr)
+			else:
+				def searcher(expr, item): 		  # pylint: disable=E0102
+					return item.startswith(expr)
+		else:
+			# Could have nested these, but this is faster.
+			raise ValueError("Unknown search type:", func)
+
+	output = []
+	for item in the_list:
+		if searcher(expr, item):
+			if isinstance(the_list, dict):
+				output.append(the_list[item])
+			else:
+				output.append(item)
+			if getfirst:
+				return output[0]
+	return output
+
+
+def error(*args, header='\nError:', **kargs):
+	eprint(*args, header=header, v=3, **kargs)
+	sys.exit(1)
+
+
+def safe_filename(filename, src="/ ", dest="-_", no_http=True, length=200, forbidden="*?\\/:<>|"):
+	'''Convert urls and the like to safe filesystem names
+	src, dest is the character translation table
+	length is the max length allowed, set to 200 so rdiff-backup doesn't get upset
+	forbidden characters are deleted'''
+	if no_http:
+		if filename.startswith("http") or filename.startswith("www."):
+			netloc = urlparse(filename).netloc
+			filename = filename[filename.find(netloc):]
+			filename = re.sub("^www\\.", "", filename)
+			filename = filename.strip('/')
+	filename = filename.translate(filename.maketrans(src, dest)).strip()
+	return ''.join(c for c in filename.strip() if c not in forbidden)[:length]
+
+
+def joiner(char, *args):
+	return char.join(map(str, args))
+
+
+def mkdir(target, exist_ok=True, **kargs):
+	"Make a directory without fuss"
+	os.makedirs(target, exist_ok=exist_ok, **kargs)
+
+
+def sig(num, digits=3):
+	"Return number formatted for significant digits"
+	if num == 0:
+		return '0'
+	negative = '-' if num < 0 else ''
+	num = abs(float(num))
+	power = math.log(num, 10)
+	if num < 1:
+		num = int(10**(-int(power) + digits) * num)
+		return negative + '0.' + '0' * -int(power) + str(int(num)).rstrip('0')
+	elif power < digits - 1:
+		return negative + ('{0:.' + str(digits) + 'g}').format(num)
+	else:
+		return negative + str(int(num))
+
+
+def percent(num, digits=0):
+	if not digits:
+		return str(int(num * 100)) + '%'
+	else:
+		return sig(num * 100, digits) + '%'
+
+
+def sorted_array(array, column=-1, reverse=False):
+	"Return sorted 2d array line by line"
+	pairs = [(line[column], index) for index, line in enumerate(array)]
+	for _val, index in sorted(pairs, reverse=reverse):
+		# print(index, val)
+		yield array[index]
+
+
+def avg(lis):
+	"Average a list"
+	return sum(lis) / len(lis)
+
+
+def debug_pass(*args, **kargs):         # pylint: disable=unused-argument
+	"Drop in replacement to disable debug lines"
+	pass    # pylint: disable=unnecessary-pass
+
+
+def read_file(filename):
+	"Read an entire file into text"
+	with open(filename, 'r') as f:
+		return f.read()
+
+
+def read_val(file):
+	"Read a number from an open file handle"
+	file.seek(0)
+	return int(file.read())
+
+
+def trailing_avg(lis, power=0.5):
+	"Weighted average that biases the last parts of this list more:"
+	total = 0
+	weights = 0
+	for index, num in enumerate(lis):
+		weight = (index + 1)**power
+		total += weight * num
+		weights += weight
+	return total / weights
+
+
+def chunker(lis, lines=2, overlap=False):
+	'''Take a list a return its values n items at a time
+	alternate way: zip(*[iter(lis)]*n)'''
+	step = 1 if overlap else lines
+	for start in range(0, len(lis) - lines + 1, step):
+		yield lis[start:start + lines]
+
+
+def spawn(func, *args, daemon=True, delay=0, **kargs):
+	'''Spawn a function to run seperately and return the que
+	waits for delay seconds before running
+	Get the results with que.get()
+	Check if the thread is still running with thread.is_alive()
+	replaces fork_cmd, mcall
+	print('func=', func, id(func))'''
+
+	def worker():
+		if delay:
+			time.sleep(delay)
+		ret = func(*args, **kargs)
+		que.put(ret)
+
+	que = queue.Queue()
+	# print('args=', args)
+	thread = threading.Thread(target=worker)
+	thread.daemon = daemon
+	thread.start()
+	return que, thread
+
+
+class _TmanObj():
+	"Used for ThreadManager"
+
+	def __init__(self, func, *args, delay=0, **kargs):
+		self.start = time.time()
+		self.que, self.thread = spawn(func, *args, delay=delay, **kargs)
+
+	def age(self):
+		return time.time() - self.start
+
+	def is_alive(self):
+		return self.thread.is_alive()
+
+
+class ThreadManager():
+	"Maintain a list of threads and when they were started, query() to see if done."
+
+	def __init__(self):
+		self.threads = dict()
+
+	def query(self, func, *args, delay=0, max_age=0, **kargs):
+		"Start thread if new, return status, que.get()"
+		serial = id(func)
+
+		obj = self.threads.get(serial, None)
+		if max_age and obj and obj.age() > max_age:
+			print("Thread aged out")
+			del obj
+			obj = None
+		if obj and obj.is_alive():
+			print("Can't get results now, we got quilting to do!")
+			return False, None
+		if obj:
+			del self.threads[serial]
+			return True, obj.que.get()
+
+		# print("Starting thread!")
+		obj = _TmanObj(func, *args, delay=delay, **kargs)
+		self.threads[serial] = obj
+		return False, None
+
+	def remove(self, func):
+		"Remove thread if in dict"
+		serial = id(func)
+		if serial in self.threads:
+			del self.threads[serial]
+
+
 def read_csv(filename, ignore_comments=True, cleanup=True, headers=None, merge=False, delimiter=',', **kargs):
 	'''Read a csv while stripping comments and turning numbers into numbers
 	ignore_comments = ignore a leading #
@@ -764,7 +381,7 @@ def read_csv(filename, ignore_comments=True, cleanup=True, headers=None, merge=F
 			else:
 				for d in delimiter[1:]:
 					if d in line:
-						#??? https://www.python.org/dev/peps/pep-0479/
+						# This is fixed in python 3.7 anyway: https://github.com/PyCQA/pylint/issues/3424
 						row = next(csv.reader([line.replace(d, delimiter[0])], delimiter=delimiter[0], **kargs))
 						print("Using backup delimiter to read line:", repr(d))
 						break
@@ -781,322 +398,151 @@ def read_csv(filename, ignore_comments=True, cleanup=True, headers=None, merge=F
 					yield get_headers(clean(row))
 
 
-def gohome():
-	os.chdir(os.path.dirname(sys.argv[0]))
-
-
-def error(*args, header='\nError:', **kargs):
-	eprint(*args, header=header, v=3, **kargs)
-	sys.exit(1)
-
-
-def msleep(seconds, accuracy=1/60):
-	'''Sleep for a time period and return amount of missing time during sleep
-	For example, if computer was in suspend mode.
-	Average error is about 100ms per 1000 seconds = .01%
-	'''
-	start = time.time()
-	time.sleep(seconds)
-	elapsed = time.time() - start
-	if elapsed / seconds > 1 + accuracy:
-		return elapsed - seconds
-	else:
-		return 0
-
-
-def safe_filename(filename, src="/ ", dest="-_", no_http=True, length=200, forbidden="*?\\/:<>|"):
-	'''Convert urls and the like to safe filesystem names
-	src, dest is the character translation table
-	length is the max length allowed, set to 200 so rdiff-backup doesn't get upset
-	forbidden characters are deleted'''
-	if no_http:
-		if filename.startswith("http") or filename.startswith("www."):
-			netloc = urlparse(filename).netloc
-			filename = filename[filename.find(netloc):]
-			filename = re.sub("^www\\.", "", filename)
-			filename = filename.strip('/')
-	filename = filename.translate(filename.maketrans(src, dest)).strip()
-	return ''.join(c for c in filename.strip() if c not in forbidden)[:length]
-
-
-def spawn(func, *args, daemon=True, delay=0, **kargs):
-	'''Spawn a function to run seperately and return the que
-	waits for delay seconds before running
-	Get the results with que.get()
-	Check if the thread is still running with thread.is_alive()
-	replaces fork_cmd, mcall
-	print('func=', func, id(func))'''
-
-	def worker():
-		if delay:
-			time.sleep(delay)
-		ret = func(*args, **kargs)
-		que.put(ret)
-
-	que = queue.Queue()
-	# print('args=', args)
-	thread = threading.Thread(target=worker)
-	thread.daemon = daemon
-	thread.start()
-	return que, thread
-
-
-def diff_days(*args):
-	'''Return days between two timestamps
-	or between now and timestamp
-	Ex: diff_days(time.time(), time.time()+86400)
-	Ex: diff_days(timestamp)'''
-	if len(args) == 2:
-		start = args[0]
-		end = args[1]
-	else:
-		end = args[0]
-		start = time.time()
-	diff = (dada.fromtimestamp(end) - dada.fromtimestamp(start))
-	return diff.days + diff.seconds / 86400  # + diff.microseconds/86400e6
-
-
-def local_time(timestamp=None, user_format=None):
-	'''Given a unix timestamp, show the local time in a nice format:
-	By default will not show date, unless more than a day into future.Format info here:
-	https://docs.python.org/3.5/library/time.html#time.strftime '''
-	if not timestamp:
-		timestamp = time.time()
-
-	if user_format:
-		fmt = user_format
-	else:
-		fmt = '%I:%M %p'
-		if timestamp and time.localtime()[:3] != time.localtime(timestamp)[:3]:
-			if time.localtime()[:2] != time.localtime(timestamp)[:2]:
-				# New month
-				fmt = '%Y-%m-%d'
-			else:
-				if diff_days(timestamp) < 7:
-					# New day of week
-					fmt = '%a %I:%M %p'
-				else:
-					# New day in same month
-					fmt = '%m-%d %I:%M %p'
-
-	return time.strftime(fmt, time.localtime(timestamp))
-
-
 def rint(num):
 	return str(int(round(num)))
 
 
-def match_conversion(text, conversions):
-	"match text against a list of conversions"
-	if text in conversions:
-		return conversions[text]
-	matches = search_list(text, conversions.keys())
-	if len(matches) == 1:
-		return conversions[matches[0]]
-	elif len(matches) > 1:
-		if len({conversions[m] for m in matches}) == 1:
-			return conversions[matches[0]]
-		else:
-			warn("Multiple Matches found for:", text)
-			for match in matches:
-				print("\t", match.title())
-			raise ValueError
-	return None
+def shell(cmd, **kargs):
+	"Return first line of stdout"
+	return quickrun(cmd, **kargs)[0].strip()
 
 
-def search_list(expr, the_list, getfirst=False, func='match', ignorecase=True, searcher=None):
-	'''Search for expression in each item in list (or dictionary!)
-	getfirst = Return the first value found, otherwise None
-	searcher = Custom lamda function'''
-
-	if not searcher:
-		# func = dict(search='in').get('search', func)
-		# Avoiding regex now in case substring has a regex escape character
-		if ignorecase:
-			expr = expr.lower()
-		if func in ('in', 'search'):
-			if ignorecase:
-				def searcher(expr, item): 	      # pylint: disable=E0102
-					return expr in item.lower()
-			else:
-				def searcher(expr, item): 		  # pylint: disable=E0102
-					return expr in item
-		elif func == 'match':
-			if ignorecase:
-				def searcher(expr, item): 		  # pylint: disable=E0102
-					return item.lower().startswith(expr)
-			else:
-				def searcher(expr, item): 		  # pylint: disable=E0102
-					return item.startswith(expr)
-		else:
-			# Could have nested these, but this is faster.
-			raise ValueError("Unknown search type:", func)
-
-	output = []
-	for item in the_list:
-		if searcher(expr, item):
-			if isinstance(the_list, dict):
-				output.append(the_list[item])
-			else:
-				output.append(item)
-			if getfirst:
-				return output[0]
-	return output
+def undent(text, tab=''):
+	return '\n'.join([tab + line.lstrip() for line in text.splitlines()])
 
 
-def convert_user_time(unum, default='hours'):
-	'''Convert a user input time like 3.14 days to seconds
-	Valid: 3h, 3 hours, 3 a.m., 3pm, 3:14 am, 3:14pm'''
-	unum = str(unum).strip().lower()
-	if ',' in unum:
-		return sum(map(convert_user_time, unum.split(',')))
-	if not unum:
-		return 0
+def list_get(lis, index, default=''):
 
-	# Build conversion table
-	self = convert_user_time
-	if not hasattr(self, 'conversions'):
-		day = 3600 * 24
-		year = 365.2422 * day
-
-		self.conversions = dict(
-			seconds=1,
-			minutes=60,
-			hours=3600,
-			days=day,
-			weeks=7 * day,
-			months=30.4167 * day,
-			years=year,
-			decades=10 * year,
-			centuries=100 * year,
-			century=100 * year,
-			millenia=1000 * year,
-			millenium=1000 * year,
-
-			# Esoteric:
-			fortnight=14 * day,
-			quarter=30.4167 * day * 3,
-			jubilees=50 * year,
-			biennium=2 * year,
-			gigasecond=1e9,
-			aeons=1e9 * year, eons=1e9 * year,
-			jiffy=1 / 60, jiffies=1 / 60,
-			shakes=1e-8,
-			svedbergs=1e-13,
-			decasecond=10,
-			hectosecond=100,
-
-			# Nonstandard years
-			tropicalyears=365.24219 * day,
-			gregorianyears=year,
-			siderealyears=365.242190 * day,
-
-			# <1 second
-			plancktimes=5.391e-44, plancks=5.391e-44,
-			yoctoseconds=1e-24, ys=1e-24,
-			zeptoseconds=1e-21, zs=1e-21,
-			attoseconds=1e-18,
-			femtoseconds=1e-15, fs=1e-15,
-			picoseconds=1e-12, ps=1e-12,
-			nanoseconds=1e-09, ns=1e-9,
-			microseconds=1e-06, us=1e-6,
-			milliseconds=1e-3, ms=1e-3)
-		self.conversions['as'] = 1e-18
-	conversions = self.conversions
-
-	# Primary units
-	primary = "seconds minutes hours days months years".split()
-
-	# 12 am fix
-	if re.match('12[^1234567890].*am', unum) or unum == '12am':
-		unum = unum.replace('12', '0')
-
-	# Text processing:
-	text = unum.lstrip('0123456789. \t:')
-	num = unum.replace(text, '').strip()
-
-	if ':' in num:
-		# Convert a num like 3:14:60 into fractions of 60
-		seconds = 0
-		for x, t in enumerate(num.split(':')):
-			seconds += float(t) / 60**x
-		num = seconds
-
-	num = float(num)
-	if text:
-		text = text.replace('.', '').strip().replace(' ', '')
-		if text == 'am':
-			return num * 3600
-		elif text == 'pm':
-			return num * 3600 + 12 * 3600
-		else:
-			# Match the text with the first unit found in units so that 3m matches minutes, not months
-			unit = search_list(text, primary, getfirst=True)
-			if not unit:
-				# Otherwise search for less commonly used units in entire list
-				unit = match_conversion(text, conversions)
-			else:
-				unit = conversions[unit]
-			return num * unit
+	# Fetch a value from a list if it exists, otherwise return default
+	# Now accepts negative indexes
+	length = len(lis)
+	if -length <= index < length:
+		return lis[index]
 	else:
-		return num * conversions[default]
+		return default
 
 
-def convert_ut_range(unum, **kargs):
-	"User time ranges like 3-5pm to machine readable"
-	unum = unum.lower().strip().split('-')
-	count = Counter([item[-2:] for item in unum])
-	pm = count['pm']
-	am = count['am']
-	if (pm or am) and not all([pm, am]):
-		unit = 'pm' if pm else 'am'
-		value = None		# Value of last time encountered
-		for x in range(len(unum)):
-			if unum[x]:
-				if unum[x].endswith(unit):
-					value = convert_user_time(unum[x].strip('pm').strip('am'))
-				else:
-					if value is not None and convert_user_time(unum[x]) < value:
-						continue
-					unum[x] = unum[x] + unit
-	return [convert_user_time(item, **kargs) for item in unum]
+def update_parser(lines, parser=None, hidden=False, positionals=False):
+	'''
+	This is a more intuitive method for adding optional arguments.
+	For positional arguments, use the standard syntax.
+
+	Example: basic_args = [\
+	('--alias', 'variable_name', type, default),
+	"help string",
+	...
+	]
+
+	group_basic = parser.add_argument_group('Basic Arguments', '')
+	update_parser(basic_args, group_basic)
+
+	#You only need to include the arguments required, but you can't skip over any.
+		('--alias', '',)        # okay
+		('--alias', type,)      # not okay
+
+	#Substitute the word list with a number like 2 to get that number of args required.
+
+	# See what your arugments are producing with:
+		auto_cols(sorted([[key, repr(val)] for key, val in (vars(parse_args())).items()]))
 
 
-def mkdir(target, exist_ok=True, **kargs):
-	"Make a directory without fuss"
-	os.makedirs(target, exist_ok=exist_ok, **kargs)
+	'''
 
+	# Make sure the loop ends on a help string
+	if not isinstance(lines[-1], str):
+		lines.append("")
 
-def check_install(*programs, msg=''):
-	'''Check if program is installed (and reccomend procedure to install)
-	programs is the list of programs to test
-	prints msg if it can't find any'''
+	alias = None        #
+	varname = None      # Variable Name
+	default = None      # Default value
+	out = []
 
-	errors = 0
-	for program in programs:
-		paths = shutil.which(program)
-		if not paths:
-			errors += 1
-			print(program, 'is not installed.')
-	if errors:
-		if msg:
-			if type(msg) == str:
-				print("To install type:", msg)
+	def update():
+		nonlocal alias
+		"# Update argument to parser:"
+		if parser:
+			if positionals:
+				parser.add_argument(varname, default=default, nargs=nargs, help=msg)
 			else:
-				print("To install type:")
-				for m in msg:
-					print('\t' + m)
+				alias = '--' + alias
+				if typ == bool:
+					parser.add_argument(alias, dest=varname, default=default, action=action, help=msg)
+				else:
+					parser.add_argument(alias, dest=varname, default=default, type=typ,
+										nargs=nargs, help=msg, metavar='')
+			out.append(dict(alias=alias, dest=varname, typ=typ, default=default, msg=msg))
+			# print('alias', alias, 'varname', varname, 'default', default, 'type', typ, 'nargs', nargs)
+
+	for index, args in enumerate(lines):
+
+		# Add help if available
+		if isinstance(args, str):
+			msg = undent(args.strip())
+			if msg and not msg.endswith('.'):
+				last = msg.split()[-1]
+				if last[-1].isalnum() and not last.startswith('-'):
+					msg = msg + '.'
+			if default:
+				msg += "  Default: " + str(default)
+
+		if hidden:
+			# Hide the help text:
+			msg = argparse.SUPPRESS
+
+		# If on a new tuple line, add_argument
+		if alias or varname:
+			update()
+			alias = None
+			varname = None
+			msg = ""
+
+		# Continue if not on a new tuple line
+		if isinstance(args, str):
+			continue
+
+		# Read the values from the tuple:
+		alias = args[0].lstrip('-')
+
+		varname = list_get(args, 1)
+		if not varname:
+			varname = alias
+
+		default = list_get(args, 3, '')
+		typ = list_get(args, 2, type(default))
+		if typ == list:
+			nargs = '*'
+			typ = str
+			default = []
+		elif isinstance(typ, int):
+			nargs = typ
+			typ = str
 		else:
-			print("Please install to continue...")
-		sys.exit(1)
+			nargs = '?'
+
+		if typ == bool:
+			if default:
+				action = 'store_false'
+			else:
+				action = 'store_true'
+				default = False
+		if index == len(lines) - 1:
+			update()
+
+	return out
 
 
-def indenter(*args, header='', level=0, tab=4, wrap=0, even=False):
-	"Break up text into tabbed lines. Wrap at max characters. 0 = Don't wrap"
+def indenter(*args, header='', level=0, tab=4, wrap=-4, even=False):
+	'''Break up text into tabbed lines.
+	Wrap at max characters:
+		0 = Don't wrap
+		negtaive = wrap to terminal width minus wrap
+	'''
+	if wrap < 0:
+		wrap = TERM_WIDTH + wrap
 
 	if type(tab) == int:
 		tab = ' ' * tab
-	header = header + tab * level
+	header = str(header) + tab * level
 	words = (' '.join(map(str, args))).split(' ')
 
 	lc = float('inf')       # line count
@@ -1126,6 +572,419 @@ def indenter(*args, header='', level=0, tab=4, wrap=0, even=False):
 	return out
 
 
+def print_columns(args, col_width=20, columns=None, just='left', space=0, wrap=True):
+	'''Print columns of col_width size.
+	columns = manual list of column widths
+	just = justification: left, right or center'''
+
+	just = just[0].lower()
+	if not columns:
+		columns = [col_width] * len(args)
+
+	output = ""
+	_col_count = len(columns)
+	extra = []
+	for count, section in enumerate(args):
+		width = columns[count]
+		section = str(section)
+
+		if wrap:
+			lines = None
+			if len(section) > width - space:
+				# print(section, len(section), width)
+				# lines = slicer(section, *([width] * (len(section) // width + 1)))
+				lines = indenter(section, wrap=width - space)
+				if len(lines) >= 2 and len(lines[-1]) <= space:
+					lines[-2] += lines[-1]
+					lines.pop(-1)
+			if '\n' in section:
+				lines = section.split('\n')
+			if lines:
+				section = lines[0]
+				for lineno, line in enumerate(lines[1:]):
+					if lineno + 1 > len(extra):
+						extra.append([''] * len(args))
+					extra[lineno][count] = line
+
+		if just == 'l':
+			output += section.ljust(width)
+		elif just == 'r':
+			output += section.rjust(width)
+		elif just == 'c':
+			output += section.center(width)
+	print(output)
+
+	for line in extra:
+		print_columns(line, col_width, columns, just, space, wrap=False)
+
+
+def auto_columns(array, space=4, manual=None, printme=True, wrap=0, crop=None):
+	'''Automatically adjust column size
+	Takes in a 2d array and prints it neatly
+	space = spaces between columns
+	manual = dictionary of column adjustments made to space variable
+	crop = array of max length for each column, 0 = unlimited
+	example: {-1:2} sets the space variable to 2 for the last column
+	wrap = wrap at this many columns. 0 = terminal width
+	'''
+	if not manual:
+		manual = dict()
+
+	# Convert generators and map objects:
+	array = list(array)
+
+	if crop:
+		out = []
+		for row in array:
+			row = list(row)
+			for index, _ in enumerate(row):
+				line = str(row[index])
+				cut = crop[index]
+				if len(line) > cut > 3:
+					row[index] = line[:cut-3]+'...'
+			out.append(row)
+		array = out
+
+
+	# Fixed so array can have inconsistently sized rows
+	col_width = {}
+	for row in array:
+		row = list(map(str, row))
+		for col, _ in enumerate(row):
+			length = len(row[col])
+			if length > col_width.get(col, 0):
+				col_width[col] = length
+
+	col_width = [col_width[key] for key in sorted(col_width.keys())]
+	spaces = [space] * len(col_width)
+	spaces[-1] = 0
+
+	# Make any manual adjustments
+	for col, val in manual.items():
+		spaces[col] = val
+
+	col_width = [sum(x) for x in zip(col_width, spaces)]
+
+	# Adjust for line wrap
+	max_width = get_terminal_size().columns - 1 # Terminal size
+	if wrap:
+		max_width = min(max_width, wrap)
+	extra = sum(col_width) - max_width          # Amount columns exceed the terminal width
+
+	def fill_remainder():
+		"After operation to reduce column sizes, use up any remaining space"
+		remain = max_width - sum(col_width)
+		for x, _ in enumerate(col_width):
+			if remain:
+				col_width[x] += 1
+				remain -= 1
+
+	if extra > 0:
+		# print('extra', extra, 'total', total, 'max_width', max_width)
+		# print(col_width, '=', sum(col_width))
+		if max(col_width) > 0.5 * sum(col_width):
+			# If there's one large column, reduce it
+			index = col_width.index(max(col_width))
+			col_width[index] -= extra
+			if col_width[index] < max_width // len(col_width):
+				# However if that's not enough reduce all columns equally
+				col_width = [max_width // len(col_width)] * len(col_width)
+				fill_remainder()
+		else:
+			# Otherwise reduce all columns proportionally
+			col_width = [int(width * (max_width / (max_width + extra))) for width in col_width]
+			fill_remainder()
+		# print(col_width, '=', sum(col_width))
+
+	# Turn on for visual representation of columns:
+	# print(''.join([str(count) * x  for count, x in enumerate(col_width)]))
+
+	if printme:
+		for row in array:
+			print_columns(row, columns=col_width, space=0)
+
+	return col_width
+
+
+class DotDict(dict):
+	'''
+	Example:
+	m = dotdict({'first_name': 'Eduardo'}, last_name='Pool', age=24, sports=['Soccer'])
+
+	Modified from:
+	https://stackoverflow.com/questions/2352181/how-to-use-a-dot-to-access-members-of-dictionary
+	to set unlimited chained .variables like DotDict().tom.bob = 3
+	'''
+
+	def __init__(self, *args, default=None, **kwargs):
+		super(DotDict, self).__init__(*args, **kwargs)
+		for arg in args:
+			if isinstance(arg, dict):
+				for k, v in arg.items():
+					self[k] = v
+#
+		if kwargs:
+			for k, v in kwargs.items():
+				self[k] = v
+#
+	def __getattr__(self, attr):
+		if attr in self:
+			return self.get(attr)
+		else:
+			self[attr] = DotDict()
+			return self[attr]
+#
+	def __setattr__(self, key, value):
+		self.__setitem__(key, value)
+#
+	def __contains__(self, key):
+		return bool(key in self.__dict__)
+#
+	def __setitem__(self, key, value):
+		super(DotDict, self).__setitem__(key, value)
+		self.__dict__.update({key: value})
+#
+	def __delattr__(self, item):
+		self.__delitem__(item)
+#
+	def __delitem__(self, key):
+		super(DotDict, self).__delitem__(key)
+		del self.__dict__[key]
+
+
+class ArgMaster():
+	'''
+	A wrapper class for ArgumentParser with easy to use arguments. See update_parser() for details.
+	sortme will sort all arguments by name (except positionals)
+	other arguments are passed onto the ArgumentParser constructor
+	'''
+
+	def __init__(self, sortme=True, allow_abbrev=True, usage=None, description=None, **kargs):
+		self.sortme = sortme            # Sort all non positionals args
+		self.groups = []                # List of all groups
+		self.usage = usage				# Usage message
+		self.description = description
+		self.parser = argparse.ArgumentParser(allow_abbrev=allow_abbrev, add_help=False, **kargs)
+		# Allow optionals before positionals:
+		self.intermixed = hasattr(self.parser, 'parse_intermixed_args')
+
+	def update(self, args, title=None, sortme=None, **kargs):
+		group = self.parser.add_argument_group(title)
+		args = update_parser(args, group, **kargs)
+		self.groups.append(DotDict(args=args, title=title, sortme=sortme))
+
+	def parse(self, args=None, am_help=True):
+		if not args:
+			args = sys.argv[1:]
+
+		if not am_help:
+			self.parser.add_help = True
+			return self.parser.parse_args(args)
+
+		# Match help
+		for arg in args:
+			if re.match('--*h$|--*help$', arg):
+				# help_parser(self.parser)
+				self.print_help()
+				sys.exit(0)
+		try:
+			if self.intermixed:
+				return self.parser.parse_intermixed_args(args)
+			else:
+				return self.parser.parse_args(args)
+		except SystemExit:
+			self.print_help()
+			sys.exit(0)
+
+	def print_help(self, show_type=True, wrap=0, tab='  '):
+		'''Print a custom help message using only ArgMaster args
+		show_type = append the variable type expected after each optional argument.
+		--arg <int> <int> will expect 2 integers after the arg
+		wrap = word wrap instead of using full terminal. 0 = Terminal width
+		sort = sort alphabetically. Positional variables are never sorted.
+		To sort individual groups, add a special key: group.sortme = True
+
+		Warning: If your variable is not in a group, it will not be shown!'''
+
+		if self.description:
+			print('\n' + self.description)
+
+		if self.usage:
+			name = os.path.basename(sys.argv[0])
+			print('\n' + "Usage:", name, self.usage)
+		final = []
+		width = 0                       # Max width of the variables column
+		for group in self.groups:
+			out = []
+			for args in group.args:
+				args = DotDict(args)
+				msg = args.msg
+				if msg == argparse.SUPPRESS:
+					continue
+				alias = args.alias
+				if show_type:
+					if args.typ and args.typ != bool:
+						if args.typ == list:
+							typ = '...'
+						else:
+							typ = '<' + str(args.typ).replace('class ', '')[2:-2] + '>'
+						alias += ' ' + typ
+				if len(alias) > width:
+					width = len(alias)
+				out.append([alias, msg])
+
+			if group.sortme is not None:
+				sortme = group.sortme
+			else:
+				sortme = self.sortme
+			if sortme:
+				# Sort the group while mainting the order of positional arguments at the top
+				positionals = [out.pop(line) for line in range(len(out) - 1, -1, -1) if out[line][0].startswith('<')]
+				out.sort()
+				out = list(reversed(positionals)) + out
+			final.append(out)
+
+		for index, out in enumerate(final):
+			group = self.groups[index]
+			if out:
+				for line, _ in enumerate(out):
+					out[line][0] = tab + out[line][0].ljust(width)
+				print()
+				if group.title:
+					print(group.title.rstrip(':') + ':')
+				if group.description:
+					auto_cols([[tab + group.description]])
+				auto_cols(out, wrap=wrap)
+		print()
+
+
+def argfixer():
+	'''Fix up args for argparse. Lowers case and turns -args into --args'''
+	out = []
+	for word in sys.argv:
+		if word.startswith('-'):
+			word = word.lower()
+		if re.match('^-[^-]', word):
+			out.append('-' + word)
+		else:
+			out.append(word)
+	return out[1:]
+
+
+def easy_parse(optionals_list, pos_list=None, **kargs):
+	'''
+	Simpler way to pass arguments to ArgMaster class.
+	All kargs are passed to ArgMaster. See the actual implementation for details.
+	'''
+	am = ArgMaster(**kargs)
+	if pos_list:
+		am.update(pos_list, title="Positional Arguments", positionals=True)
+	am.update(optionals_list, title="Optional Arguments")
+	return am.parse(argfixer())
+
+
+def check_install(*programs, msg=''):
+	'''Check if program is installed (and reccomend procedure to install)
+	programs is the list of programs to test
+	prints msg if it can't find any'''
+
+	errors = 0
+	for program in programs:
+		paths = shutil.which(program)
+		if not paths:
+			errors += 1
+			print(program, 'is not installed.')
+	if errors:
+		if msg:
+			if type(msg) == str:
+				print("To install type:", msg)
+			else:
+				print("To install type:")
+				for m in msg:
+					print('\t' + m)
+		else:
+			print("Please install to continue...")
+		sys.exit(1)
+
+
+def flatten(tree):
+	"Flatten a nested list, tuple or dict of any depth into a flat list"
+	# For big data sets use this: https://stackoverflow.com/a/45323085/11343425
+	out = []
+	if isinstance(tree, dict):
+		for key, val in tree.items():
+			if type(val) in (list, tuple, dict):
+				out += flatten(val)
+			else:
+				out.append({key: val})
+
+	else:
+		for item in tree:
+			if type(item) in (list, tuple, dict):
+				out += flatten(item)
+			else:
+				out.append(item)
+	return out
+
+
+def quickrun(*cmd, check=False, encoding='utf-8', errors='replace', mode='w', input=None,	# pylint: disable=W0622
+			 verbose=0, testing=False, ofile=None, trifecta=False, hidewarning=False, **kargs):
+	'''Run a command, list of commands as arguments or any combination therof and return
+	the output is a list of decoded lines.
+	check    = if the process exits with a non-zero exit code then quit
+	testing  = Print command and don't do anything.
+	ofile    = output file
+	mode     = output file write mode
+	trifecta = return (returncode, stdout, stderr)
+	input	 = stdinput (auto converted to bytes)
+	'''
+	cmd = list(map(str, flatten(cmd)))
+	if len(cmd) == 1:
+		cmd = cmd[0]
+
+	if testing:
+		print("Not running command:", cmd)
+		return []
+
+	if verbose:
+		print("Running command:", cmd)
+		print("               =", ' '.join(cmd))
+
+	if ofile:
+		output = open(ofile, mode=mode)
+	else:
+		output = subprocess.PIPE
+
+	if input:
+		if type(input) != bytes:
+			input = input.encode()
+
+	#Run the command and get return value
+	ret = subprocess.run(cmd, check=check, stdout=output, stderr=output, input=input, **kargs)
+	code = ret.returncode
+	stdout = ret.stdout.decode(encoding=encoding, errors=errors).splitlines() if ret.stdout else []
+	stderr = ret.stderr.decode(encoding=encoding, errors=errors).splitlines() if ret.stderr else []
+
+	if ofile:
+		output.close()
+		return []
+
+	if trifecta:
+		return code, stdout, stderr
+
+	if code and not hidewarning:
+		warn("Process returned code:", code)
+
+	for line in stderr:
+		print(line)
+
+	return stdout
+
+
+def gohome():
+	os.chdir(os.path.dirname(sys.argv[0]))
+
+
 class Eprinter:
 	'''Drop in replace to print errors if verbose level higher than setup level
 	To replace every print statement type: from common import eprint as print
@@ -1149,6 +1008,19 @@ class Eprinter:
 
 	def __init__(self, verbose=0):
 		self.level = verbose
+		self.history = []
+
+		#If string starts with '\n', look at history to make sure previous newlines don't exist
+		self.autonewlines = True
+
+	def newlines(self, num=1):
+		"Print the required number of newlines after checking history to make sure they exist."
+		lines = sum([1 for line in self.history[-num:] if not line.strip()])
+		num -= lines
+		if num:
+			print('\n' * (num), end='')
+		return num
+
 
 	def eprint(self, *args, v=0, color=None, header=None, **kargs):
 		'''Print to stderr
@@ -1169,6 +1041,19 @@ class Eprinter:
 			color = '\x1b[' + color + 'm'
 
 		msg = ' '.join(map(str, args))
+		if self.autonewlines:
+			match = re.match('^\n*', msg)
+			if match:
+				num = self.newlines(match.span()[1])
+				if num:
+					#print('created', num, 'newlines', repr(msg[:64]))
+					msg = msg.lstrip('\n')
+
+
+		self.history += msg.splitlines()
+		if len(self.history) > 64:
+			self.history = self.history[64:]
+
 		if header:
 			msg = header + ' ' + msg
 		if color:
@@ -1178,13 +1063,23 @@ class Eprinter:
 		return len(msg)
 
 
-eprint = Eprinter(verbose=1).eprint     # pylint: disable=C0103
-
-
 def warn(*args, header="\n\nWarning:", delay=1 / 64):
 	time.sleep(eprint(*args, header=header, v=2) * delay)
 
 
+def itercount(start=0, step=1):
+	"Save an import itertools"
+	x = start
+	while True:
+		yield x
+		x += step
+
+
+qrun = quickrun		# pylint: disable=C0103
+eprint = Eprinter(verbose=1).eprint     # pylint: disable=C0103
+tman = ThreadManager()  # pylint: disable=C0103
+TERM_WIDTH = get_terminal_size().columns
+auto_cols = auto_columns    # pylint: disable=C0103
 
 '''
 &&&&%%%%%&@@@@&&&%%%%##%%%#%%&@@&&&&%%%%%%/%&&%%%%%%%%%%%&&&%%%%%&&&@@@@&%%%%%%%
@@ -1224,5 +1119,5 @@ def warn(*args, header="\n\nWarning:", delay=1 / 64):
 &&&&&%(((*.*... . .*,.   .           .*%%#(,.          .    .*,. ..,.,,**/(%#&%%
 
 Generated by https://github.com/SurpriseDog/Star-Wrangler
-2021-05-16
+2021-05-30
 '''

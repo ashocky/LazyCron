@@ -7,10 +7,9 @@ import time
 import sys
 import os
 
-from sd_common import local_time, trailing_avg, chunker, read_file
-from sd_common import msleep, pmsleep, Eprinter, eprint, read_val, list_get
-from sd_common import fmt_time, debug_pass as debug, warn
-
+from sd_common import chunker, trailing_avg, warn, read_val, read_file, list_get
+from sd_common import debug_pass as debug, Eprinter
+from sd_chronology import local_time, fmt_time, msleep, pmsleep
 
 eprint = Eprinter(verbose=1).eprint		# pylint: disable=C0103
 
