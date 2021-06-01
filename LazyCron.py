@@ -140,7 +140,7 @@ def main(args):
 		# Run scripts if enough elapsed time has passed
 		for proc in schedule_apps:
 			if proc.in_window() and proc.next_elapsed <= elapsed:
-				if args.skip and counter < 8:
+				if args.skip and counter < 2:
 					testing = True
 				else:
 					testing = testing_mode
