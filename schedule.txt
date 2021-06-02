@@ -26,12 +26,13 @@
 
 # Edit these lines with your own schedule:
 
-#Time              Frequency     Date              Requirements            Script Path
-8:30pm-3am         1h            sat-sun           idle 5m, plugged        # ./backup_script_path_goes_here.sh
--5pm               *             m-f               random 8h               # ./A_surprise_everyday.py
-4-6pm              *             2nd Thursday      *                       # mpg123 'Libera - Going Home.mp3'
-*                  *             *                 *                       # ./a_daily_script.py
-*                  *             March 14          *                       # ./pi_day.py
+#Time              Frequency     Date              Requirements           Script Path
+8:30pm-3am         1h            sat-sun           idle 5m, plugged       # ./backup_script_path_goes_here.sh
+-5pm               *             m-f               random 8h              # ./A_surprise_everyday.py
+4-6pm              *             2nd Thursday      *                      # mpg123 'Libera - Going Home.mp3'
+*                  *             *                 *                      # ./a_daily_script.py
+*                  *             March 14          *                      # ./pi_day.py
+*                  *             1st-2nd           *                      # zenity --info --text="Monthly list"
 
 
 

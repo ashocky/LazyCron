@@ -88,8 +88,8 @@ def main(args):
 					  --idle requires iostat () to determine if the computer can be put to sleep.''')
 	check_install('xprintidle', msg="sudo apt install xprintidle")
 
-	schedule_file = args.schedule
-	testing_mode = args.testing
+	schedule_file = args.schedule	# Tab seperated input file
+	testing_mode = args.testing		# Don't actually do anything
 
 	sleep_time = polling_rate   # Time to rest at the end of every loop
 	idle = 0                    # Seconds without user inteaction.

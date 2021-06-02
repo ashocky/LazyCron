@@ -201,7 +201,7 @@ def wait4popup(batt, target):
 def _main():
 	"Wait until the battery gets to target level and then popup a warning"
 	batt = BatteryWatcher()
-	target = list_get(sys.argv, 1, 5)
+	target = int(list_get(sys.argv, 1, 5))
 	batt.wait_until(target+10)
 	wait4popup(batt, target)
 

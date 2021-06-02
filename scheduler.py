@@ -267,7 +267,7 @@ class Scheduler:
 					self.start, self.stop = self.calc_date(extra=1)
 				get_first()
 		else:
-			self.stop += 86400
+			self.stop += 86400 - 1 	#So it stops just before next day
 
 		if self.history and (self.window or self.date_window):
 			if self.start > now:
