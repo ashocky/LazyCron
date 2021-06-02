@@ -13,28 +13,47 @@ from sd_chronology import local_time, fmt_time, msleep, pmsleep
 
 eprint = Eprinter(verbose=1).eprint		# pylint: disable=C0103
 
+
+def get_filename(expr, path='/sys/class/power_supply/'):
+	"Custom filename finder for BatteryWatcher"
+	for sub in os.listdir(path):
+		for _paths, _dirs, names in os.walk(os.path.join(path, sub)):
+			for name in names:
+				if expr == name:
+					name = os.path.join(path, sub, name)
+					eprint("Using filename:", name)
+					return name
+	else:
+		print("Could not find file:", expr, 'in', path)
+		return None
+
+
 class BatteryWatcher:
 	"Keep track of the battery levels over time to predict when it will run out"
 
 	def __init__(self):
-		self.max_power = int(read_file(self.get_filename('charge_full')))
-		self.capacity = open(self.get_filename('charge_now'))
-		self.plug = open(self.get_filename('online'))
+
+		#Get battery filenames
+		for cname, mname in [['charge_now', 'charge_full'], ['energy_now', 'energy_full']]:
+			self.capacity = get_filename(cname)
+			if self.capacity:
+				self.max_power = int(read_file(get_filename(mname)))
+				break
+		else:
+			self.capacity = get_filename('capacity')
+			self.max_power = 100
+
+		if not self.capacity:
+			raise ValueError("Cannot find battery access file")
+		else:
+			print("Using file:", self.capacity)
+			self.capacity = open(self.capacity)
+
+
+		self.plug = open(get_filename('online'))
 		self.levels = dict()                # Dict of power level percents to timestamps
 		self.charge = self.check_batt()  	# Updated only with call to check_batt
 
-	def get_filename(self, expr, path='/sys/class/power_supply/'):
-		"Custom filename finder for init"
-		for sub in os.listdir(path):
-			for _paths, _dirs, names in os.walk(os.path.join(path, sub)):
-				for name in names:
-					if expr == name:
-						name = os.path.join(path, sub, name)
-						eprint("Using filename:", name)
-						return name
-		else:
-			warn("Could not find file:", expr, 'in', path)
-			raise ValueError
 
 	def is_plugged(self):
 		return bool(read_val(self.plug))
@@ -53,7 +72,6 @@ class BatteryWatcher:
 			charge = round(read_val(self.capacity) / self.max_power * 100, 1)
 			self.levels[charge] = int(time.time())
 			self.charge = charge
-			eprint(self.levels)
 			return charge
 
 	def get_rate(self):

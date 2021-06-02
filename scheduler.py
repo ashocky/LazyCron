@@ -8,16 +8,21 @@ import datetime
 import subprocess
 from datetime import datetime as dada
 
-from battery_watcher import BatteryWatcher
+import battery_watcher
 
 from sd_chronology import local_time, seconds_since_midnight, fmt_time
 from sd_chronology import convert_user_time, udate, convert_ut_range, add_date
 
 from sd_common import spawn, mkdir, joiner, indenter, safe_filename, error
-from sd_common import search_list, read_state, DotDict, Eprinter, warn
+from sd_common import search_list, read_state, DotDict, Eprinter, warn, read_val
 
 EP = Eprinter()
 eprint = EP.eprint			# pylint: disable=C0103
+PLUGGED = battery_watcher.get_filename('online')		#Is the battery plugged in?
+if PLUGGED:
+	print("Using access file:", PLUGGED)
+	PLUGGED = open(PLUGGED)
+
 
 def is_val(var):
 	if type(var) in (float, int):
@@ -30,10 +35,11 @@ def lid_open():
 
 
 def is_plugged():
-	if BATTERY:
-		return BATTERY.is_plugged()
+	"Is the computer plugged in?"
+	if PLUGGED:
+		return bool(read_val(PLUGGED))
 	else:
-		#Fake it if battery not dectected (like on Desktop)
+		#Fake it if battery not detected (like on Desktop)
 		return True
 
 
@@ -334,10 +340,3 @@ class Scheduler:
 			print(joiner(', ', *self.history))
 
 		return True
-
-
-try:
-	BATTERY = BatteryWatcher()
-except ValueError:
-	BATTERY = None
-	print("Battery monitoring will not work.")
