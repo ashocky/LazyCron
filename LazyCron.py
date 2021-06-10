@@ -10,10 +10,11 @@ import time
 import how_busy
 import scheduler
 
-from sd_common import itercount, warn, gohome, quickrun, check_install, easy_parse
-from sd_common import shell, rint, read_csv, tman
+from sd.common import itercount, warn, gohome, quickrun, check_install
+from sd.common import shell, rint, read_csv, tman
 
-from sd_chronology import local_time, msleep, fmt_time
+from sd.chronology import local_time, msleep, fmt_time
+from arg_master import easy_parse
 
 def parse_args():
 	"Parse arguments"
@@ -67,7 +68,6 @@ def is_busy(max_net=100, max_disk=1):
 	max_net = Network usage in KB/s
 	max_disk = Disk usage in MB/s
 	'''
-
 	net_usage = how_busy.get_network_usage(5, 4)     # KB/s
 	disk_usage = how_busy.all_disk_usage(5, 4)       # MB/s
 
@@ -99,6 +99,7 @@ def main(args):
 	timestamp = time.time()     # Timestamp at start of loop
 	last_schedule_read = 0      # last time the schedule file was read
 	schedule_apps = []
+	cur_day = time.strftime('%d')
 	for counter in itercount():
 		# Sleep at the end of every loop
 		if counter:
@@ -127,6 +128,9 @@ def main(args):
 			timestamp = new_time
 			if args.verbose >= 2:   # not (counter - 1) % 10:
 				print(local_time(), 'Elapsed:', fmt_time(elapsed), 'Idle:', rint(total_idle))
+			if time.strftime('%d') != cur_day:
+				cur_day = time.strftime('%d')
+				print(time.strftime('\nToday is %A, %-m-%d'))
 
 
 		# Read the schedule file if it's been updated

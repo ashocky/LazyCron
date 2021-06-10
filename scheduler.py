@@ -10,18 +10,22 @@ from datetime import datetime as dada
 
 import battery_watcher
 
-from sd_chronology import local_time, seconds_since_midnight, fmt_time
-from sd_chronology import convert_user_time, udate, convert_ut_range, add_date
+from sd.chronology import local_time, seconds_since_midnight, fmt_time
+from sd.chronology import convert_user_time, udate, convert_ut_range, add_date
 
-from sd_common import spawn, mkdir, joiner, indenter, safe_filename, error
-from sd_common import search_list, read_state, DotDict, Eprinter, warn, read_val
+from sd.common import spawn, mkdir, joiner, indenter, safe_filename, error
+from sd.common import search_list, read_state, DotDict, Eprinter, warn, read_val
 
 EP = Eprinter()
 eprint = EP.eprint			# pylint: disable=C0103
+
+
+#Get power plug status
 PLUGGED = battery_watcher.get_filename('online')		#Is the battery plugged in?
 if PLUGGED:
 	print("Using access file:", PLUGGED)
 	PLUGGED = open(PLUGGED)
+	print('Current Status:', ('Unplugged', 'Plugged in')[read_val(PLUGGED)])
 
 
 def is_val(var):
@@ -54,7 +58,7 @@ def get_day(day, cycle, today=None):
 	elif cycle == 'month':
 		delta = datetime.timedelta((day - today.day))
 		if delta.days < 0:
-			delta = datetime.timedelta(add_date(today, months=1).replace(day=day) - today)
+			delta = add_date(today, months=1).replace(day=day) - today
 	elif cycle == 'year':
 		month, day = day
 		date = today.replace(month=month, day=day)
