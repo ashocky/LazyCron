@@ -2,7 +2,7 @@ Using Cron is nice if you have a server or never turn off your computer, but wha
 
 With LazyCron, "Your computer will get around to it eventually." LazyCron takes a more lackadaisical approach to life. Sure it will get the job done, but there's no rush.
 
-You don't set a time to run, you set a range. In schedule.txt, "Time" is the window is when the script is allowed to run. You can have multiple time windows separated with commas. For example: 1-3am, 2pm-4m, 11:30-11:34 - Play around with these numbers, the system is very flexible. When you run my script it will show you the next time window available for each program so you can confirm it's doing what you expected.
+You don't set a time to run, you set a range. In schedule.txt, "Time" is the window is when the script is allowed to run. You can have multiple time windows separated with commas. For example: 1-3am, 2pm-4pm, 11:30-11:34 - Play around with these numbers, the system is very flexible. When you run my script it will show you the next time window available for each program so you can confirm it's doing what you expected.
 
 
 "Frequency" is how often the program. m = minutes, h = hours and so on. My script should allow most natural language inputs here. Time towards frequency is only counted when the computer is actively in use. Set as * and it will only run once a day.

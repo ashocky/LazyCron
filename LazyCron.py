@@ -14,7 +14,7 @@ from sd.common import itercount, warn, gohome, quickrun, check_install
 from sd.common import shell, rint, read_csv, tman
 
 from sd.chronology import local_time, msleep, fmt_time
-from arg_master import easy_parse
+from sd.arg_master import easy_parse
 
 def parse_args():
 	"Parse arguments"
