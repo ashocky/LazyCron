@@ -5,6 +5,13 @@ With LazyCron, "Your computer will get around to it eventually." LazyCron takes 
 You don't set a time to run, you set a range. In schedule.txt, "Time" is the window is when the script is allowed to run. You can have multiple time windows separated with commas. For example: 1-3am, 2pm-4pm, 11:30-11:34 - Play around with these numbers, the system is very flexible. When you run my script it will show you the next time window available for each program so you can confirm it's doing what you expected.
 
 
+===
+
+Usage: Edit schedule.txt and run LazyCron.py
+
+Type -h for help
+
+
 "Frequency" is how often the program. m = minutes, h = hours and so on. My script should allow most natural language inputs here. Time towards frequency is only counted when the computer is actively in use. Set as * and it will only run once a day.
 
 "Date" field can limit it to run on certain days of the week:
@@ -39,11 +46,3 @@ Requirements:
 
 	* xprintidle to get the idle time
 	* systat package to get iostat which is used to measure disk activity before putting computer to sleep.
-
-
-====
-
-
-Usage: Edit schedule.txt and run LazyCron.py
-
-Type -h for help
