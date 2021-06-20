@@ -148,7 +148,7 @@ class Scheduler:
 
 
 	def process_time(self, section):
-		vals = convert_ut_range(section)
+		vals = convert_ut_range(section, default='hours')
 		if len(vals) == 2:
 			self.window.append([vals[0], vals[1]])
 		else:
@@ -254,7 +254,7 @@ class Scheduler:
 			"Find earliest start, return True if updated."
 			new_start = inf
 			for start, stop in self.window:
-				if stop < start: 				# ex: 11pm-1am
+				if stop < start:
 					stop += 86400
 				start += self.start
 				stop += self.stop
@@ -285,6 +285,9 @@ class Scheduler:
 			else:
 				print("Time window for", self.name, 'closes in', fmt_time(self.stop - now))
 
+		if not now <= self.stop:
+			error('miscalculation!', self.name, now, 'start', self.start, 'stop', self.stop)
+
 
 	def in_window(self):
 		"Check if within time window to run, otherwise recalculate a new time window"
@@ -307,7 +310,7 @@ class Scheduler:
 			if self.reqs.closed and lid_open():
 				eprint("\tLid not closed", v=-1)
 				return False
-			if self.reqs.plugged and not BATTERY.is_plugged():
+			if self.reqs.plugged and not is_plugged():
 				eprint("\tNot plugged in", v=-1)
 				return False
 			if self.reqs.idle > idle:

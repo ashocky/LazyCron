@@ -121,7 +121,6 @@ def main(args):
 			else:
 				idle = total_idle
 			new_time = time.time()
-			_old = elapsed
 			elapsed += new_time - timestamp - idle
 			if counter == 1:
 				elapsed = 0
@@ -130,7 +129,8 @@ def main(args):
 				print(local_time(), 'Elapsed:', fmt_time(elapsed), 'Idle:', rint(total_idle))
 			if time.strftime('%d') != cur_day:
 				cur_day = time.strftime('%d')
-				print(time.strftime('\nToday is %A, %-m-%d'))
+				print(time.strftime('\n\nToday is %A, %-m-%d'))
+				print('#'*80)
 
 
 		# Read the schedule file if it's been updated
